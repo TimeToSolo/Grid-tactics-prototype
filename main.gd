@@ -83,7 +83,7 @@ var pending_attack_target = -1
 var pending_heal_target = -1
 
 # Enemy providing delayed coverage reaction.
-var pending_coverage_enemy = -1
+var pending_coverage_enemies: Array[int] = []
 
 
 # ==================================================
@@ -1171,6 +1171,8 @@ func is_clicking_empty_action_tile(clicked_cell: Vector2i) -> bool:
 
 	var unit_class = units[selected_unit]["class"]
 
+	var attack_tiles: Array[Vector2i] = []
+
 	if unit_class == "healer":
 
 		var heal_tiles = unit_logic.get_heal_choice_tiles(
@@ -1178,7 +1180,7 @@ func is_clicking_empty_action_tile(clicked_cell: Vector2i) -> bool:
 			map_data
 		)
 
-		var attack_tiles = unit_logic.get_adjacent_choice_tiles(
+		attack_tiles = unit_logic.get_adjacent_choice_tiles(
 			pending_move_cell,
 			map_data
 		)
@@ -1188,7 +1190,7 @@ func is_clicking_empty_action_tile(clicked_cell: Vector2i) -> bool:
 			or attack_tiles.has(clicked_cell)
 		)
 
-	var attack_tiles = unit_logic.get_attack_choice_tiles(
+	attack_tiles = unit_logic.get_attack_choice_tiles(
 		pending_move_cell,
 		unit_class,
 		map_data
@@ -1320,7 +1322,7 @@ func select_unit(unit_index: int):
 	pending_facing = Vector2i.ZERO
 	pending_move_distance = 0
 	pending_move_direction = Vector2i.ZERO
-	pending_coverage_enemy = -1
+	pending_coverage_enemies.clear()
 
 	pending_attack_target = -1
 	pending_heal_target = -1
@@ -1358,7 +1360,7 @@ func handle_move_tile_click(clicked_cell: Vector2i):
 
 	pending_move_cell = clicked_cell
 
-	pending_coverage_enemy = get_enemy_entered_coverage(
+	pending_coverage_enemies = get_enemies_entered_coverage(
 		selected_unit,
 		selected_unit_start_cell,
 		clicked_cell
@@ -1473,7 +1475,7 @@ func clear_selection():
 	pending_move_distance = 0
 	pending_move_direction = Vector2i.ZERO
 
-	pending_coverage_enemy = -1
+	pending_coverage_enemies.clear()
 
 
 # =========================
@@ -1810,7 +1812,7 @@ func has_active_coverage(unit_index: int) -> bool:
 
 
 # =========================
-# Returns the first enemy whose coverage
+# Returns all enemies whose coverage
 # the moving unit ENTERED.
 #
 # Does not trigger if:
@@ -1819,11 +1821,13 @@ func has_active_coverage(unit_index: int) -> bool:
 # - the unit stands still inside coverage
 # =========================
 
-func get_enemy_entered_coverage(
+func get_enemies_entered_coverage(
 	unit_index: int,
 	start_cell: Vector2i,
 	target_cell: Vector2i
-) -> int:
+) -> Array[int]:
+
+	var covering_enemies: Array[int] = []
 
 	var moving_team = units[unit_index]["team"]
 
@@ -1845,13 +1849,16 @@ func get_enemy_entered_coverage(
 		var ended_in_coverage = covered_tiles.has(target_cell)
 
 		if ended_in_coverage and not started_in_coverage:
-			return i
+			covering_enemies.append(i)
 
-	return -1
+	return covering_enemies
 
 
 # =========================
 # Resolves delayed coverage damage.
+#
+# Multiple overlapping coverage zones
+# each resolve individually.
 #
 # Returns:
 # - true if selected unit dies
@@ -1860,17 +1867,23 @@ func get_enemy_entered_coverage(
 
 func resolve_pending_coverage_if_needed() -> bool:
 
-	if pending_coverage_enemy == -1:
+	if pending_coverage_enemies.is_empty():
 		return false
 
-	var unit_died = resolve_coverage_reaction(
-		selected_unit,
-		pending_coverage_enemy
-	)
+	for covering_enemy in pending_coverage_enemies:
 
-	pending_coverage_enemy = -1
+		var unit_died = resolve_coverage_reaction(
+			selected_unit,
+			covering_enemy
+		)
 
-	return unit_died
+		if unit_died:
+			pending_coverage_enemies.clear()
+			return true
+
+	pending_coverage_enemies.clear()
+
+	return false
 
 
 # =========================

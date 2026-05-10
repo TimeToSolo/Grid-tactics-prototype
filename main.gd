@@ -113,28 +113,19 @@ var turn_number = 1
 # RENDERING
 # ==================================================
 
-# =========================
-# Main draw order.
-#
-# Draw order matters:
-# - grid first
-# - overlays second
-# - units above overlays
-# - UI prompts last
-# =========================
-
 func _draw():
 
 	draw_grid()
 
 	draw_move_tiles()
+	draw_heal_range()
 	draw_attack_range()
 
 	draw_all_coverage()
-	draw_coverage_preview()
 
 	draw_pending_move_tile()
 	draw_facing_choice_tiles()
+	draw_coverage_preview()
 
 	draw_units()
 
@@ -240,10 +231,7 @@ func draw_pending_move_tile():
 # =========================
 # Draws attack preview overlays.
 #
-# Archer:
-# - red = normal range
-# - orange = reduced close range
-# - white = point-blank
+# Red tiles show valid attack range.
 # =========================
 
 func draw_attack_range():
@@ -258,11 +246,17 @@ func draw_attack_range():
 
 	if has_pending_move():
 
-		attack_tiles = unit_logic.get_attack_choice_tiles(
-			pending_move_cell,
-			unit_class,
-			map_data
-		)
+		if unit_class == "healer":
+			attack_tiles = unit_logic.get_adjacent_choice_tiles(
+				pending_move_cell,
+				map_data
+			)
+		else:
+			attack_tiles = unit_logic.get_attack_choice_tiles(
+				pending_move_cell,
+				unit_class,
+				map_data
+			)
 
 	else:
 
@@ -280,43 +274,56 @@ func draw_attack_range():
 
 		var rect = map_data.grid_rect(tile)
 
-		var fill_color = Color(1.0, 0.15, 0.15, 0.15)
+		var fill_color = Color(1.0, 0.15, 0.15, 0.18)
 		var border_color = Color(1.0, 0.1, 0.1, 0.9)
 
-		if unit_class == "archer":
+		if unit_class == "healer":
+			draw_rect(rect, border_color, false, 3)
+		else:
+			draw_rect(rect, fill_color, true)
+			draw_rect(rect, border_color, false, 3)
 
-			if not has_pending_move():
+# =========================
+# Draws healer support range after moving.
+#
+# Blue tiles show valid heal/regeneration range.
+# =========================
 
-				fill_color = Color(1.0, 0.15, 0.15, 0.25)
-				border_color = Color(1.0, 0.1, 0.1, 0.95)
+func draw_heal_range():
 
-			else:
+	if selected_unit == -1:
+		return
 
-				var center = pending_move_cell
-				var diff = tile - center
+	if not has_pending_move():
+		return
 
-				var distance_squared = (
-					diff.x * diff.x
-					+ diff.y * diff.y
-				)
+	if units[selected_unit]["class"] != "healer":
+		return
 
-				if distance_squared <= 2:
+	var heal_tiles = unit_logic.get_heal_choice_tiles(
+		pending_move_cell,
+		map_data
+	)
 
-					fill_color = Color(1.0, 1.0, 1.0, 0.35)
-					border_color = Color(1.0, 1.0, 1.0, 0.95)
+	for tile in heal_tiles:
 
-				elif distance_squared <= 5:
+		if not map_data.is_inside_grid(tile):
+			continue
 
-					fill_color = Color(1.0, 0.55, 0.0, 0.35)
-					border_color = Color(1.0, 0.45, 0.0, 0.95)
+		var rect = map_data.grid_rect(tile)
 
-				else:
+		draw_rect(
+			rect,
+			Color(0.2, 0.8, 1.0, 0.22),
+			true
+		)
 
-					fill_color = Color(1.0, 0.15, 0.15, 0.25)
-					border_color = Color(1.0, 0.1, 0.1, 0.95)
-
-		draw_rect(rect, fill_color, true)
-		draw_rect(rect, border_color, false, 3)
+		draw_rect(
+			rect,
+			Color(0.2, 0.9, 1.0, 0.9),
+			false,
+			3
+		)
 
 
 # ==================================================
@@ -408,7 +415,7 @@ func draw_all_coverage():
 
 # =========================
 # Draws green preview coverage while hovering
-# a facing direction tile.
+# a valid facing-selection tile.
 # =========================
 
 func draw_coverage_preview():
@@ -422,20 +429,35 @@ func draw_coverage_preview():
 	if is_hovering_attackable_enemy():
 		return
 
-	var facing_tiles = unit_logic.get_facing_choice_tiles(
-		pending_move_cell,
-		pending_move_distance,
-		pending_move_direction,
-		units[selected_unit]["move"],
-		map_data
-	)
-
-	if not facing_tiles.has(hovered_cell):
-		return
-
-	var facing = hovered_cell - pending_move_cell
-
 	var unit_class = units[selected_unit]["class"]
+	var facing: Vector2i = Vector2i.ZERO
+
+	if unit_class == "lancer":
+
+		var lancer_tiles = get_valid_lancer_facing_tiles()
+
+		if not lancer_tiles.has(hovered_cell):
+			return
+
+		facing = get_lancer_facing_from_target(
+			pending_move_cell,
+			hovered_cell
+		)
+
+	else:
+
+		var facing_tiles = unit_logic.get_facing_choice_tiles(
+			pending_move_cell,
+			pending_move_distance,
+			pending_move_direction,
+			units[selected_unit]["move"],
+			map_data
+		)
+
+		if not facing_tiles.has(hovered_cell):
+			return
+
+		facing = hovered_cell - pending_move_cell
 
 	var coverage_tiles = unit_logic.get_coverage_tiles(
 		unit_class,
@@ -490,7 +512,21 @@ func draw_facing_choice_tiles():
 	if move_tiles.size() > 0:
 		return
 
-	if units[selected_unit]["class"] == "archer":
+	if (
+		units[selected_unit]["class"] == "archer"
+		or units[selected_unit]["class"] == "healer"
+	):
+		return
+		
+	if units[selected_unit]["class"] == "lancer":
+
+		for cell in get_valid_lancer_facing_tiles():
+			draw_rect(
+				map_data.grid_rect(cell),
+				Color(0.7, 0.2, 1.0, 0.55),
+				true
+			)
+
 		return
 
 	var facing_tiles = unit_logic.get_facing_choice_tiles(
@@ -587,10 +623,11 @@ func draw_units():
 				Color.BLACK
 			)
 
-		draw_unit_facing(
-			pos,
-			unit["facing"]
-		)
+		if unit["class"] != "healer" and unit["class"] != "archer":
+			draw_unit_facing(
+				pos,
+				unit["facing"]
+			)
 
 
 # =========================
@@ -718,6 +755,13 @@ func draw_attack_hover_preview():
 		4
 	)
 
+# =========================
+# Draws hover preview for valid
+# healer support targets.
+#
+# Highlights healable allies currently
+# inside healer support range.
+# =========================
 
 func draw_heal_hover_preview():
 
@@ -1002,6 +1046,16 @@ func handle_left_click():
 			handle_attack_click(clicked_cell)
 			return
 
+		if (
+			is_clicking_empty_action_tile(clicked_cell)
+			and (
+				units[selected_unit]["class"] == "archer"
+				or units[selected_unit]["class"] == "healer"
+			)
+		):
+			start_wait_confirmation()
+			return
+
 		if should_handle_facing_click(clicked_cell):
 			handle_facing_click(clicked_cell)
 			return
@@ -1013,7 +1067,6 @@ func handle_left_click():
 		return
 
 	handle_unit_click(clicked_cell)
-
 
 # ==================================================
 # CLICK PHASE HELPERS
@@ -1034,11 +1087,24 @@ func should_handle_facing_click(
 	if not has_pending_move():
 		return false
 
-	if units[selected_unit]["class"] == "archer":
+	if (
+		units[selected_unit]["class"] == "archer"
+		or units[selected_unit]["class"] == "healer"
+	):
 		return false
 
 	if is_hovering_attackable_enemy():
 		return false
+
+	if units[selected_unit]["class"] == "lancer":
+
+		var lancer_tiles = unit_logic.get_attack_choice_tiles(
+			pending_move_cell,
+			"lancer",
+			map_data
+		)
+
+		return lancer_tiles.has(clicked_cell)
 
 	var facing_tiles = unit_logic.get_facing_choice_tiles(
 		pending_move_cell,
@@ -1050,6 +1116,112 @@ func should_handle_facing_click(
 
 	return facing_tiles.has(clicked_cell)
 
+# =========================
+# Returns all valid lancer
+# facing-selection tiles.
+#
+# Filters lancer attack tiles using
+# movement-based facing restrictions.
+# =========================
+
+func get_valid_lancer_facing_tiles() -> Array[Vector2i]:
+
+	var valid_tiles: Array[Vector2i] = []
+
+	var lancer_tiles = unit_logic.get_attack_choice_tiles(
+		pending_move_cell,
+		"lancer",
+		map_data
+	)
+
+	var allowed_dirs = unit_logic.get_limited_facing_dirs(
+		pending_move_direction
+	)
+
+	for cell in lancer_tiles:
+
+		var facing = get_lancer_facing_from_target(
+			pending_move_cell,
+			cell
+		)
+
+		if allowed_dirs.has(facing):
+			valid_tiles.append(cell)
+
+	return valid_tiles
+
+# =========================
+# Returns true if clicking an empty
+# action-range tile after moving.
+#
+# Used by archer/healer to allow
+# empty target-range clicks to prompt wait.
+# =========================
+
+func is_clicking_empty_action_tile(clicked_cell: Vector2i) -> bool:
+
+	if selected_unit == -1:
+		return false
+
+	if not has_pending_move():
+		return false
+
+	if get_unit_at(clicked_cell) != -1:
+		return false
+
+	var unit_class = units[selected_unit]["class"]
+
+	if unit_class == "healer":
+
+		var heal_tiles = unit_logic.get_heal_choice_tiles(
+			pending_move_cell,
+			map_data
+		)
+
+		var attack_tiles = unit_logic.get_adjacent_choice_tiles(
+			pending_move_cell,
+			map_data
+		)
+
+		return (
+			heal_tiles.has(clicked_cell)
+			or attack_tiles.has(clicked_cell)
+		)
+
+	var attack_tiles = unit_logic.get_attack_choice_tiles(
+		pending_move_cell,
+		unit_class,
+		map_data
+	)
+
+	return attack_tiles.has(clicked_cell)
+
+# =========================
+# Returns lancer facing direction
+# based on selected attack tile.
+#
+# Knight-move attack tiles automatically
+# resolve to a cardinal facing direction
+# using the dominant movement axis.
+# =========================
+
+func get_lancer_facing_from_target(
+	start_cell: Vector2i,
+	target_cell: Vector2i
+) -> Vector2i:
+
+	var diff = target_cell - start_cell
+
+	if abs(diff.x) > abs(diff.y):
+		return Vector2i(sign(diff.x), 0)
+
+	if abs(diff.y) > abs(diff.x):
+		return Vector2i(0, sign(diff.y))
+
+	return Vector2i(
+		sign(diff.x),
+		sign(diff.y)
+	)
 
 # =========================
 # Returns true if this click should
@@ -1226,18 +1398,31 @@ func handle_facing_click(clicked_cell: Vector2i):
 	if not has_pending_move():
 		return
 
-	var facing_tiles = unit_logic.get_facing_choice_tiles(
-		pending_move_cell,
-		pending_move_distance,
-		pending_move_direction,
-		units[selected_unit]["move"],
-		map_data
-	)
+	var valid_facing_click = false
 
-	if not facing_tiles.has(clicked_cell):
+	if units[selected_unit]["class"] == "lancer":
+		valid_facing_click = get_valid_lancer_facing_tiles().has(clicked_cell)
+	else:
+		var facing_tiles = unit_logic.get_facing_choice_tiles(
+			pending_move_cell,
+			pending_move_distance,
+			pending_move_direction,
+			units[selected_unit]["move"],
+			map_data
+		)
+
+		valid_facing_click = facing_tiles.has(clicked_cell)
+
+	if not valid_facing_click:
 		return
 
-	pending_facing = clicked_cell - pending_move_cell
+	if units[selected_unit]["class"] == "lancer":
+		pending_facing = get_lancer_facing_from_target(
+			pending_move_cell,
+			clicked_cell
+		)
+	else:
+		pending_facing = clicked_cell - pending_move_cell
 
 	units[selected_unit]["facing"] = pending_facing
 	units[selected_unit]["has_acted"] = true
@@ -1509,6 +1694,11 @@ func confirm_heal():
 	)
 
 	units[selected_unit]["heal_charges"] -= 1
+	units[selected_unit]["stamina"] = max(
+		units[selected_unit]["stamina"]
+		- units[selected_unit]["heal_stamina_cost"],
+		0
+		)
 	units[selected_unit]["has_acted"] = true
 
 	pending_heal_target = -1
@@ -1553,6 +1743,11 @@ func confirm_regen():
 	)
 
 	units[selected_unit]["heal_charges"] -= 1
+	units[selected_unit]["stamina"] = max(
+		units[selected_unit]["stamina"]
+		- units[selected_unit]["regen_stamina_cost"],
+		0
+		)
 	units[selected_unit]["has_acted"] = true
 
 	pending_heal_target = -1
@@ -1783,13 +1978,13 @@ func get_display_stamina(unit_index: int) -> int:
 		0
 	)
 
-# ==================================================
-# HEALER HELPERS
-# ==================================================
-
 # =========================
-# Recovers 1 healer charge for player healers
-# that did not act this turn.
+# Recovers healer charges based on
+# remaining stamina at turn end.
+#
+# 90+ stamina = +2 charges
+# 50+ stamina = +1 charge
+# Below 50 = no recovery
 # =========================
 
 func recover_idle_player_healers():
@@ -1802,11 +1997,22 @@ func recover_idle_player_healers():
 		if unit["class"] != "healer":
 			continue
 
-		if unit["has_acted"]:
-			continue
+		var recovery_amount = 0
+
+		if (
+			unit["stamina"]
+			>= unit["charge_recovery_threshold_2"]
+		):
+			recovery_amount = 2
+
+		elif (
+			unit["stamina"]
+			>= unit["charge_recovery_threshold_1"]
+		):
+			recovery_amount = 1
 
 		unit["heal_charges"] = min(
-			unit["heal_charges"] + 1,
+			unit["heal_charges"] + recovery_amount,
 			unit["max_heal_charges"]
 		)
 
@@ -1933,11 +2139,19 @@ func is_hovering_attackable_enemy() -> bool:
 	if not has_pending_move():
 		return false
 
-	var attack_tiles = unit_logic.get_attack_choice_tiles(
-		pending_move_cell,
-		units[selected_unit]["class"],
-		map_data
-	)
+	var attack_tiles: Array[Vector2i] = []
+
+	if units[selected_unit]["class"] == "healer":
+		attack_tiles = unit_logic.get_adjacent_choice_tiles(
+			pending_move_cell,
+			map_data
+		)
+	else:
+		attack_tiles = unit_logic.get_attack_choice_tiles(
+			pending_move_cell,
+			units[selected_unit]["class"],
+			map_data
+		)
 
 	if not attack_tiles.has(hovered_cell):
 		return false
@@ -1949,6 +2163,8 @@ func is_hovering_attackable_enemy() -> bool:
 
 # =========================
 # Returns true if hovering a healable ally.
+#
+# Uses healer support range, not lancer range.
 # =========================
 
 func is_hovering_healable_ally() -> bool:
@@ -1959,9 +2175,8 @@ func is_hovering_healable_ally() -> bool:
 	if not has_pending_move():
 		return false
 
-	var heal_tiles = unit_logic.get_attack_choice_tiles(
+	var heal_tiles = unit_logic.get_heal_choice_tiles(
 		pending_move_cell,
-		"lancer",
 		map_data
 	)
 

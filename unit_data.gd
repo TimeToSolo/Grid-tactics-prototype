@@ -50,12 +50,19 @@ var unit_templates = {
 	},
 
 	"healer": {
-		"move": 5,
+		"move": 4,
 		"hp": 18,
 		"attack": 5,
 		"attack_stamina_cost": 20,
 		"counter_stamina_cost": 999,
 		"counter_damage_multiplier": 0.0,
+
+		"heal_stamina_cost": 60,
+		"regen_stamina_cost": 60,
+
+		"charge_recovery_threshold_1": 50,
+		"charge_recovery_threshold_2": 90,
+
 		"heal_charges": 3,
 		"max_heal_charges": 3
 	},
@@ -126,7 +133,19 @@ func create_unit(
 	}
 
 	if unit_class == "healer":
+
 		unit["heal_charges"] = template["heal_charges"]
 		unit["max_heal_charges"] = template["max_heal_charges"]
+
+		unit["heal_stamina_cost"] = template["heal_stamina_cost"]
+		unit["regen_stamina_cost"] = template["regen_stamina_cost"]
+
+		unit["charge_recovery_threshold_1"] = (
+			template["charge_recovery_threshold_1"]
+		)
+
+		unit["charge_recovery_threshold_2"] = (
+			template["charge_recovery_threshold_2"]
+		)
 
 	return unit

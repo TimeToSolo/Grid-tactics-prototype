@@ -156,6 +156,40 @@ func get_attack_choice_tiles(
 
 	return tiles
 
+# =========================
+# Returns valid healer support tiles
+# after moving.
+#
+# Healing range uses:
+# - maximum distance sqrt(5)
+# - excludes the healer's own tile
+# - excludes far 5x5 corners
+# =========================
+
+func get_heal_choice_tiles(
+	center: Vector2i,
+	map_data
+) -> Array[Vector2i]:
+
+	var tiles: Array[Vector2i] = []
+
+	for x in range(-2, 3):
+		for y in range(-2, 3):
+
+			var tile = center + Vector2i(x, y)
+
+			if tile == center:
+				continue
+
+			var distance_squared = x * x + y * y
+
+			if distance_squared > 5:
+				continue
+
+			if map_data.is_inside_grid(tile):
+				tiles.append(tile)
+
+	return tiles
 
 # =========================
 # Returns true if this class uses adjacent attack targeting.

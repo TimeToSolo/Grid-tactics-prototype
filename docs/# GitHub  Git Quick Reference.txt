@@ -5,7 +5,7 @@ Project: Grid-tactics-prototype
 ---
 
 To open Git Bash:
-Right click inside the project folder (where this file is located)
+Right click inside the project folder
 → Show more options
 → Open Git Bash Here
 

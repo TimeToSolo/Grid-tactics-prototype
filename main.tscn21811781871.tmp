@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://ohrrm1nhcxt"]
+
+[ext_resource type="Script" uid="uid://burd2okbf4jbj" path="res://main.gd" id="1_ig7tw"]
+[ext_resource type="Script" uid="uid://di3r555hxcmci" path="res://map_data.gd" id="2_1bvp3"]
+[ext_resource type="Script" uid="uid://cvmll7fplummx" path="res://unit_logic.gd" id="3_lquwl"]
+[ext_resource type="Script" uid="uid://cnxwwu5kveh3m" path="res://combat_logic.gd" id="4_7mycd"]
+[ext_resource type="Script" uid="uid://chetvakrq2tmk" path="res://turn_manager.gd" id="5_lquwl"]
+
+[node name="Main" type="Node2D" unique_id=370152938]
+script = ExtResource("1_ig7tw")
+
+[node name="MapData" type="Node" parent="." unique_id=95860349]
+script = ExtResource("2_1bvp3")
+
+[node name="UnitLogic" type="Node" parent="." unique_id=13643229]
+script = ExtResource("3_lquwl")
+
+[node name="CombatLogic" type="Node" parent="." unique_id=1573065663]
+script = ExtResource("4_7mycd")
+
+[node name="TurnManager" type="Node" parent="." unique_id=183880828]
+script = ExtResource("5_lquwl")

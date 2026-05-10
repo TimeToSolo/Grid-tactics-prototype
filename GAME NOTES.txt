@@ -1,0 +1,494 @@
+# Tactical Prototype – Gameplay Notes (Current Build)
+
+## Core Gameplay Structure
+
+The prototype is a grid-based tactical RPG inspired by Fire Emblem, Advance Wars, and formation-focused strategy games.
+
+The current focus is:
+
+* movement + positioning
+* directional defense / coverage
+* stamina-based reactions
+* ranged line-of-sight combat
+* terrain interaction
+* controlled retreat gameplay
+
+The project currently uses:
+
+* square grid movement
+* directional facing
+* defensive coverage zones
+* delayed action confirmation
+* stamina-based counter systems
+
+---
+
+# Current Unit Classes
+
+## Fighter
+
+* Balanced frontline unit
+* Medium HP / medium attack
+* Wide defensive coverage
+* Can counterattack multiple times if stamina allows
+
+### Stats
+
+* HP: 26
+* Attack: 9
+* Move: 5
+
+### Stamina
+
+* Max: 100
+* Move cost: 10 per tile
+* Counter cost: 35
+* Counter damage: 80%
+
+---
+
+## Tank
+
+* Defensive anchor unit
+* Extremely durable
+* Strong area denial through coverage and slow zones
+* Weak offensive counter damage
+
+### Stats
+
+* HP: 36
+* Attack: 8
+* Move: 4
+
+### Stamina
+
+* Max: 100
+* Move cost: 10 per tile
+* Counter cost: 25
+* Counter damage: 50%
+
+### Special
+
+* 3-tile frontal hard coverage
+* 5-tile frontal slow/control zone
+
+---
+
+## Lancer
+
+* Anti-breakthrough / anti-cavalry concept unit
+* Long defensive threat patterns
+* Hybrid between melee and reach weapon
+
+### Stats
+
+* HP: 22
+* Attack: 10
+* Move: 5
+
+### Stamina
+
+* Max: 100
+* Move cost: 10 per tile
+* Counter cost: 30
+* Counter damage: 80%
+
+### Special
+
+* Extended spear-style coverage
+* Reach attacks
+* Long-range threat projection
+
+---
+
+## Duelist
+
+* High lethality single-target defender
+* Extremely narrow defensive coverage
+* Intended to punish direct approaches
+
+### Stats
+
+* HP: 20
+* Attack: 11
+* Move: 6
+
+### Stamina
+
+* Max: 100
+* Move cost: 10 per tile
+* Counter cost: 30
+* Counter damage: 100%
+
+### Special
+
+* Single-tile lethal coverage
+* Very high reaction efficiency
+
+---
+
+## Archer
+
+* Long-range ranged attacker
+* Uses line-of-sight checks
+* Walls block arrows
+* Close-range shots are weaker
+
+### Stats
+
+* HP: 20
+* Attack: 7
+* Move: 5
+
+### Stamina
+
+* No defensive reactions currently
+
+### Range Rules
+
+* Maximum range based on distance² ≤ 18
+* Point blank:
+
+  * white tiles
+  * very weak damage
+* Close range:
+
+  * orange tiles
+  * reduced damage
+* Normal range:
+
+  * red tiles
+  * full damage
+
+### Special
+
+* Terrain and walls affect targeting
+* Uses clear line-of-sight logic
+
+---
+
+## Healer
+
+* Support unit
+* Uses heal charges
+* Can apply direct heals or regeneration
+
+### Stats
+
+* HP: 18
+* Attack: 5
+* Move: 5
+
+### Heal Charges
+
+* Starts with 3/3
+* Regains 1 charge at turn end if unused
+
+### Abilities
+
+* Direct Heal
+
+  * instant heal
+* Regeneration
+
+  * heals over several turns
+
+---
+
+# Stamina System
+
+## Purpose
+
+Stamina limits reaction attacks after movement.
+
+This creates:
+
+* real formation exhaustion
+* vulnerable advances
+* stronger defensive holds
+* less “infinite counterattack” behavior
+
+## Current Rules
+
+* Movement consumes stamina
+* Reactions consume stamina
+* Units without enough stamina lose defensive coverage
+
+## Example
+
+Tank:
+
+* Move 0 tiles:
+
+  * 4 reaction attacks possible
+* Move maximum range:
+
+  * only 2 reactions remaining
+
+This system encourages:
+
+* holding chokepoints
+* fallback lines
+* careful advances
+* layered formations
+
+---
+
+# Coverage System
+
+## Prepare Stance
+
+Units in “prepare” stance project defensive coverage.
+
+Coverage:
+
+* punishes enemies entering threatened tiles
+* uses stamina
+* depends on facing direction
+
+## Attack Stance
+
+Attacking usually removes coverage for that turn.
+
+This prevents:
+
+* full offense + full defense simultaneously
+
+## Tank Slow Zones
+
+Tanks additionally create:
+
+* movement suppression
+* area denial
+* defensive pressure
+
+without requiring direct damage.
+
+---
+
+# Movement / Facing Rules
+
+## Movement
+
+* Units select movement destination first
+* Movement preview tiles shown in cyan
+
+### Dark Cyan Tiles
+
+* maximum movement range
+* limited pivot/facing afterwards
+
+## Facing
+
+After moving:
+
+* most units choose facing direction
+* coverage depends on facing
+
+### Max-Range Pivot Restriction
+
+Units moving maximum range:
+
+* cannot instantly pivot completely backward
+* intended to reward defensive positioning
+
+---
+
+# Current Terrain Types
+
+## Grass
+
+* normal movement
+* normal attacks
+
+## Water / Rivers
+
+* blocks movement
+* arrows may pass over
+
+## Walls
+
+* block movement
+* block archer line-of-sight
+
+---
+
+# Current Input / Controls
+
+## Mouse
+
+### Left Click
+
+* Select unit
+* Select movement tile
+* Select facing direction
+* Select attack target
+* Select heal target
+
+### Hover
+
+* Shows attack previews
+* Shows heal previews
+* Shows coverage previews
+
+---
+
+# Keyboard Controls
+
+## General
+
+### C
+
+Cycle coverage overlays:
+
+1. Off
+2. Player only
+3. Enemy only
+4. All
+
+### T
+
+End current turn manually
+
+### N
+
+Cancel pending action
+
+---
+
+# Action Confirmation Hotkeys
+
+## W
+
+Confirm Wait
+
+## Y
+
+Confirm Attack
+
+## H
+
+Confirm Heal
+
+## R
+
+Confirm Regeneration
+
+---
+
+# Visual Indicators
+
+## Movement
+
+* Cyan = normal movement
+* Dark cyan = max-range movement
+
+## Pending Destination
+
+* Yellow tile
+
+## Facing Selection
+
+* Purple tiles
+
+## Coverage
+
+* Yellow = player coverage
+* Red = enemy coverage
+* Green = preview coverage
+
+## Archer Ranges
+
+* White = point blank
+* Orange = reduced effectiveness
+* Red = full effectiveness
+
+## Hover
+
+* Red highlight = attack target
+* Blue highlight = heal target
+
+---
+
+# Current Systems Implemented
+
+## Functional
+
+* Grid movement
+* Terrain collision
+* Archer wall blocking
+* Line-of-sight attacks
+* Facing system
+* Coverage zones
+* Stamina reactions
+* Healing
+* Regeneration
+* Turn management
+* Delayed movement confirmation
+* Automatic turn ending
+* Hover previews
+* Coverage previews
+
+## Refactor Status
+
+Codebase recently reorganized into:
+
+* rendering systems
+* input systems
+* movement systems
+* confirmation flow
+* coverage systems
+* stamina systems
+* helper utilities
+
+Architecture is now significantly cleaner and easier to expand.
+
+---
+
+# Current Design Goals
+
+## Gameplay Goals
+
+* formation tactics
+* retreat pressure
+* limited reactions
+* positional combat
+* meaningful terrain
+* reduced “one unit solos everything” behavior
+
+## Desired Feel
+
+The game should feel like:
+
+* holding a line
+* managing exhaustion
+* surviving enemy pressure
+* retreating to fallback positions
+* maintaining formations under stress
+
+rather than:
+
+* individual units running freely into armies.
+
+---
+
+# Planned / Future Systems
+
+## Short-Term
+
+* Better test maps
+* Cavalry
+* AI behavior
+* Terrain modifiers
+* Objective maps
+* Stamina UI improvements
+
+## Long-Term
+
+* PvP support
+* Multiple factions
+* Advanced AI personalities
+* Procedural encounters
+* Campaign structure
+* Visual novel style story presentation
+* Larger battlefields with scrolling camera

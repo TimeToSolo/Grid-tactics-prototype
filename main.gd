@@ -1186,8 +1186,9 @@ func handle_move_tile_click(clicked_cell: Vector2i):
 
 	pending_move_cell = clicked_cell
 
-	pending_coverage_enemy = get_covering_enemy(
+	pending_coverage_enemy = get_enemy_entered_coverage(
 		selected_unit,
+		selected_unit_start_cell,
 		clicked_cell
 	)
 
@@ -1213,8 +1214,8 @@ func handle_move_tile_click(clicked_cell: Vector2i):
 # =========================
 # Handles clicking a valid facing tile.
 #
-# Facing selection confirms movement
-# and places the unit into prepare stance.
+# Facing selection confirms movement,
+# updates facing direction, and ends the unit's action.
 # =========================
 
 func handle_facing_click(clicked_cell: Vector2i):
@@ -1239,7 +1240,6 @@ func handle_facing_click(clicked_cell: Vector2i):
 	pending_facing = clicked_cell - pending_move_cell
 
 	units[selected_unit]["facing"] = pending_facing
-	units[selected_unit]["stance"] = "prepare"
 	units[selected_unit]["has_acted"] = true
 
 	if resolve_pending_coverage_if_needed():
@@ -1411,7 +1411,6 @@ func confirm_attack():
 	)
 
 	units[selected_unit]["facing"] = attack_direction
-	units[selected_unit]["stance"] = "attack"
 	units[selected_unit]["has_acted"] = true
 
 	if resolve_pending_coverage_if_needed():
@@ -1423,20 +1422,9 @@ func confirm_attack():
 
 	spend_movement_stamina(selected_unit)
 
-	var diff = (
-		units[pending_attack_target]["pos"]
-		- pending_move_cell
-	)
-
-	var attack_distance = sqrt(
-		diff.x * diff.x
-		+ diff.y * diff.y
-	)
-
 	var defender_died = combat_logic.resolve_attack(
 		units[selected_unit],
-		units[pending_attack_target],
-		attack_distance
+		units[pending_attack_target]
 	)
 
 	spend_attack_stamina(selected_unit)
@@ -1470,7 +1458,6 @@ func confirm_wait():
 	if not has_pending_move():
 		return
 
-	units[selected_unit]["stance"] = "attack"
 	units[selected_unit]["has_acted"] = true
 
 	if resolve_pending_coverage_if_needed():
@@ -1522,7 +1509,6 @@ func confirm_heal():
 	)
 
 	units[selected_unit]["heal_charges"] -= 1
-	units[selected_unit]["stance"] = "attack"
 	units[selected_unit]["has_acted"] = true
 
 	pending_heal_target = -1
@@ -1567,7 +1553,6 @@ func confirm_regen():
 	)
 
 	units[selected_unit]["heal_charges"] -= 1
-	units[selected_unit]["stance"] = "attack"
 	units[selected_unit]["has_acted"] = true
 
 	pending_heal_target = -1
@@ -1604,23 +1589,23 @@ func auto_end_turn_if_needed():
 
 	queue_redraw()
 	
-# ==================================================
-# COVERAGE / REACTION SYSTEM
-# ==================================================
-
 # =========================
 # Returns true if a unit currently has active coverage.
 #
 # Coverage requires:
-# - prepare stance
+# - a valid facing direction
 # - enough stamina remaining
+# - reaction not already used
 # =========================
 
 func has_active_coverage(unit_index: int) -> bool:
 
 	var unit = units[unit_index]
 
-	if unit["stance"] != "prepare":
+	if unit["facing"] == Vector2i.ZERO:
+		return false
+
+	if unit["reaction_used"]:
 		return false
 
 	if unit["stamina"] < unit["counter_stamina_cost"]:
@@ -1630,16 +1615,18 @@ func has_active_coverage(unit_index: int) -> bool:
 
 
 # =========================
-# Returns the first enemy unit providing
-# coverage over a target tile.
+# Returns the first enemy whose coverage
+# the moving unit ENTERED.
 #
-# Returns:
-# - enemy unit index
-# - or -1 if uncovered
+# Does not trigger if:
+# - the unit started inside that same coverage
+# - the unit moves out of coverage
+# - the unit stands still inside coverage
 # =========================
 
-func get_covering_enemy(
+func get_enemy_entered_coverage(
 	unit_index: int,
+	start_cell: Vector2i,
 	target_cell: Vector2i
 ) -> int:
 
@@ -1659,7 +1646,10 @@ func get_covering_enemy(
 			units[i]["facing"]
 		)
 
-		if covered_tiles.has(target_cell):
+		var started_in_coverage = covered_tiles.has(start_cell)
+		var ended_in_coverage = covered_tiles.has(target_cell)
+
+		if ended_in_coverage and not started_in_coverage:
 			return i
 
 	return -1
@@ -1700,6 +1690,8 @@ func resolve_coverage_reaction(
 	covering_unit: int
 ) -> bool:
 
+	units[covering_unit]["reaction_used"] = true
+
 	units[covering_unit]["stamina"] = max(
 		units[covering_unit]["stamina"]
 		- units[covering_unit]["counter_stamina_cost"],
@@ -1709,7 +1701,6 @@ func resolve_coverage_reaction(
 	var defender_died = combat_logic.resolve_attack(
 		units[covering_unit],
 		units[moving_unit],
-		1.0,
 		units[covering_unit]["counter_damage_multiplier"]
 	)
 

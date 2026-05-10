@@ -5,7 +5,7 @@ extends Node
 # ==================================================
 # Handles direct combat math:
 # - attack damage
-# - archer close-range penalties
+# - archer stamina-based damage scaling
 # - counter/reaction damage multipliers
 # - healing
 # - regeneration status setup
@@ -17,9 +17,6 @@ extends Node
 
 # =========================
 # Resolves attack damage from one unit to another.
-#
-# attack_distance:
-# - used mainly for archer close-range penalties
 #
 # damage_multiplier:
 # - used for counter/reaction damage scaling
@@ -33,13 +30,12 @@ extends Node
 func resolve_attack(
 	attacker,
 	defender,
-	attack_distance: float = 1.0,
 	damage_multiplier: float = 1.0
 ) -> bool:
 
 	var damage = attacker["attack"]
 
-	# Archer attacks are weaker at very close range.
+	# Archer attacks scale with remaining stamina.
 	if attacker["class"] == "archer":
 
 		var stamina_ratio = (

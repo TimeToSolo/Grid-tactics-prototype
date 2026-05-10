@@ -17,7 +17,6 @@ var unit_templates = {
 		"move": 5,
 		"hp": 26,
 		"attack": 9,
-		"stance": "prepare",
 		"attack_stamina_cost": 45,
 		"counter_stamina_cost": 35,
 		"counter_damage_multiplier": 0.8
@@ -27,7 +26,6 @@ var unit_templates = {
 		"move": 4,
 		"hp": 36,
 		"attack": 8,
-		"stance": "prepare",
 		"attack_stamina_cost": 50,
 		"counter_stamina_cost": 25,
 		"counter_damage_multiplier": 0.5
@@ -37,7 +35,6 @@ var unit_templates = {
 		"move": 5,
 		"hp": 22,
 		"attack": 10,
-		"stance": "prepare",
 		"attack_stamina_cost": 40,
 		"counter_stamina_cost": 30,
 		"counter_damage_multiplier": 0.8
@@ -47,7 +44,6 @@ var unit_templates = {
 		"move": 6,
 		"hp": 20,
 		"attack": 11,
-		"stance": "prepare",
 		"attack_stamina_cost": 30,
 		"counter_stamina_cost": 30,
 		"counter_damage_multiplier": 1.0
@@ -57,7 +53,6 @@ var unit_templates = {
 		"move": 5,
 		"hp": 18,
 		"attack": 5,
-		"stance": "attack",
 		"attack_stamina_cost": 20,
 		"counter_stamina_cost": 999,
 		"counter_damage_multiplier": 0.0,
@@ -69,7 +64,6 @@ var unit_templates = {
 		"move": 5,
 		"hp": 20,
 		"attack": 10,
-		"stance": "attack",
 		"attack_stamina_cost": 999,
 		"counter_stamina_cost": 999,
 		"counter_damage_multiplier": 0.0
@@ -116,7 +110,6 @@ func create_unit(
 		"class": unit_class,
 		"team": team,
 
-		"stance": template["stance"],
 		"reaction_used": false,
 		"has_acted": false,
 

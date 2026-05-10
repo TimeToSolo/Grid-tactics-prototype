@@ -1,0 +1,157 @@
+#Github Guide
+
+Project: Grid-tactics-prototype
+
+---
+
+To open Git Bash:
+Right click inside the project folder (where this file is located)
+→ Show more options
+→ Open Git Bash Here
+
+---
+
+# Daily Workflow
+
+## 1. Check what changed
+
+```bash
+git status
+```
+
+Shows:
+
+* modified files
+* new files
+* deleted files
+
+---
+
+## 2. Add changes
+
+```bash
+git add .
+```
+
+This stages all current changes.
+
+---
+
+## 3. Create a commit (save snapshot)
+
+```bash
+git commit -m "Describe changes here"
+```
+
+Examples:
+
+```bash
+git commit -m "Remove old stance system"
+```
+
+```bash
+git commit -m "Add stamina-based counters"
+```
+
+```bash
+git commit -m "Fix movement cancel bug"
+```
+
+---
+
+## 4. Upload to GitHub
+
+```bash
+git push
+```
+
+This updates the GitHub repository online.
+
+---
+
+# Typical Full Update Sequence
+
+```bash
+git status
+git add .
+git commit -m "Describe changes"
+git push
+```
+
+---
+
+# Important Concepts
+
+## Git tracks:
+
+* new scripts
+* new nodes/scenes
+* deleted files
+* renamed files
+* code changes
+* most project files
+
+---
+
+## Commit = Snapshot
+
+A commit is NOT just saving.
+
+A commit creates a permanent restore point for the project.
+
+---
+
+## Good Time To Commit
+
+Commit when:
+
+* a feature works
+* a bug is fixed
+* before risky changes
+* after stabilizing a system
+
+---
+
+# Useful Commands
+
+## See commit history
+
+```bash
+git log
+```
+
+---
+
+## See current branch
+
+```bash
+git branch
+```
+
+---
+
+## Create a new experimental branch
+
+```bash
+git checkout -b branch-name
+```
+
+Example:
+
+```bash
+git checkout -b stamina-rework
+```
+
+---
+
+## Return to main branch
+
+```bash
+git checkout main
+```
+
+---
+
+# Current Repository
+
+[https://github.com/TimeToSolo/Grid-tactics-prototype](https://github.com/TimeToSolo/Grid-tactics-prototype)

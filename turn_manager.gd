@@ -44,8 +44,6 @@ func end_turn(units):
 # Refreshes units at the start of a team's turn.
 #
 # Refresh includes:
-# - clearing action state
-# - clearing old reaction state
 # - restoring stamina
 # - applying regeneration healing
 # =========================

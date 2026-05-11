@@ -30,6 +30,7 @@ extends Node2D
 @onready var coverage_system = $CoverageSystem
 @onready var hover_query = $HoverQuery
 @onready var map_data = $MapData
+@onready var selection_state = $SelectionState
 @onready var stamina_system = $StaminaSystem
 @onready var turn_manager = $TurnManager
 @onready var unit_data = $UnitData
@@ -1161,9 +1162,65 @@ func get_valid_lancer_facing_tiles() -> Array[Vector2i]:
 
 	return valid_tiles
 
+# =========================
+# Clears selection and pending movement state.
+# =========================
+
+func clear_selection():
+
+	selected_unit = -1
+	selected_unit_start_cell = Vector2i(-1, -1)
+
+	move_tiles.clear()
+
+	pending_move_cell = Vector2i(-1, -1)
+	pending_facing = Vector2i.ZERO
+	pending_move_distance = 0
+	pending_move_direction = Vector2i.ZERO
+
+	pending_coverage_enemies.clear()
+
+
+# =========================
+# Clears pending action confirmation state.
+#
+# If a unit had visually moved, it is restored
+# to its original starting cell.
+# =========================
+
+func clear_pending_action_state():
+
+	if selected_unit != -1 and has_pending_move():
+		units[selected_unit]["pos"] = selected_unit_start_cell
+
+	awaiting_attack_confirmation = false
+	awaiting_heal_confirmation = false
+	awaiting_wait_confirmation = false
+
+	pending_attack_target = -1
+	pending_heal_target = -1
+
+	clear_selection()
+
 # ==================================================
 # SELECTION / MOVEMENT FLOW
 # ==================================================
+
+func has_pending_move() -> bool:
+
+	return selection_state.has_pending_move(
+		pending_move_cell
+	)
+
+
+func used_max_movement() -> bool:
+
+	return selection_state.used_max_movement(
+		units,
+		selected_unit,
+		pending_move_cell,
+		pending_move_distance
+	)
 
 # =========================
 # Handles clicking a unit or empty tile
@@ -1360,75 +1417,6 @@ func start_wait_confirmation():
 	pending_heal_target = -1
 
 	queue_redraw()
-
-
-# =========================
-# Clears selection and pending movement state.
-# =========================
-
-func clear_selection():
-
-	selected_unit = -1
-	selected_unit_start_cell = Vector2i(-1, -1)
-
-	move_tiles.clear()
-
-	pending_move_cell = Vector2i(-1, -1)
-	pending_facing = Vector2i.ZERO
-	pending_move_distance = 0
-	pending_move_direction = Vector2i.ZERO
-
-	pending_coverage_enemies.clear()
-
-
-# =========================
-# Clears pending action confirmation state.
-#
-# If a unit had visually moved, it is restored
-# to its original starting cell.
-# =========================
-
-func clear_pending_action_state():
-
-	if selected_unit != -1 and has_pending_move():
-		units[selected_unit]["pos"] = selected_unit_start_cell
-
-	awaiting_attack_confirmation = false
-	awaiting_heal_confirmation = false
-	awaiting_wait_confirmation = false
-
-	pending_attack_target = -1
-	pending_heal_target = -1
-
-	clear_selection()
-
-
-# =========================
-# Returns true if a destination tile
-# is currently pending.
-# =========================
-
-func has_pending_move() -> bool:
-
-	return pending_move_cell != Vector2i(-1, -1)
-	
-# =========================
-# Returns true if the selected unit
-# used its full movement range.
-#
-# Full movement limits facing so the
-# unit cannot fully turn around.
-# =========================
-
-func used_max_movement() -> bool:
-
-	if selected_unit == -1:
-		return false
-
-	if not has_pending_move():
-		return false
-
-	return pending_move_distance >= units[selected_unit]["move"]
 
 # ==================================================
 # ACTION CONFIRMATION FLOW

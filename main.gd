@@ -86,6 +86,9 @@ var hovered_cell: Vector2i = Vector2i(-1, -1)
 # Current cursor-traced movement preview path.
 var hover_path_cells: Array[Vector2i] = []
 
+# Inspect enemy variable
+var inspected_enemy := -1
+
 
 # ==================================================
 # ATTACK / HEAL STATE
@@ -186,6 +189,8 @@ func _draw():
 		units,
 		coverage_mode
 	)
+	
+	draw_inspected_enemy_attack_range()
 
 	render_system.draw_pending_move_tile(
 		self,
@@ -282,6 +287,74 @@ func _draw():
 		self,
 		awaiting_heal_confirmation
 	)
+	
+
+
+# =========================
+# Draws the inspected enemy's
+# maximum threat preview.
+#
+# Yellow = movement range.
+# Red = possible attack range
+# from any valid movement tile.
+# =========================
+
+func draw_inspected_enemy_attack_range():
+
+	if inspected_enemy == -1:
+		return
+
+	if inspected_enemy >= units.size():
+		inspected_enemy = -1
+		return
+
+	var enemy = units[inspected_enemy]
+
+	var enemy_move_state = selection_system.select_unit(
+		units,
+		map_data,
+		unit_query,
+		inspected_enemy
+	)
+
+	var enemy_move_tiles = enemy_move_state["move_tiles"]
+
+	for tile in enemy_move_tiles:
+
+		if not map_data.is_inside_grid(tile):
+			continue
+
+		draw_rect(
+			map_data.grid_rect(tile),
+			Color(1.0, 1.0, 0.0, 0.25)
+		)
+
+	var threatened_tiles: Array[Vector2i] = []
+
+	for move_tile in enemy_move_tiles:
+
+		var attack_tiles = unit_logic.get_attack_choice_tiles(
+			move_tile,
+			enemy["class"],
+			map_data
+		)
+
+		for attack_tile in attack_tiles:
+
+			if not map_data.is_inside_grid(attack_tile):
+				continue
+
+			if attack_tile in threatened_tiles:
+				continue
+
+			threatened_tiles.append(attack_tile)
+
+	for tile in threatened_tiles:
+
+		draw_rect(
+			map_data.grid_rect(tile),
+			Color(1.0, 0.0, 0.0, 0.25)
+		)
 
 # ==================================================
 # ENGINE CALLBACKS
@@ -484,6 +557,12 @@ func handle_mouse_input(event):
 	# =========================
 
 	if event.button_index == MOUSE_BUTTON_RIGHT:
+
+		# Clear inspected enemy first
+		if inspected_enemy != -1:
+			inspected_enemy = -1
+			queue_redraw()
+			return
 
 		clear_pending_action_state()
 
@@ -746,6 +825,28 @@ func used_max_movement() -> bool:
 
 func handle_unit_click(clicked_cell: Vector2i):
 
+	var clicked_unit = unit_query.get_unit_at(
+		units,
+		clicked_cell
+	)
+
+	if clicked_unit != -1 and units[clicked_unit]["team"] == "enemy":
+
+		# Clicking same enemy again deselects
+		if inspected_enemy == clicked_unit:
+			inspected_enemy = -1
+			queue_redraw()
+			return
+
+		clear_selection()
+
+		inspected_enemy = clicked_unit
+
+		queue_redraw()
+		return
+
+	inspected_enemy = -1
+
 	var result = selection_system.handle_unit_click(
 		units,
 		unit_query,
@@ -770,6 +871,8 @@ func handle_unit_click(clicked_cell: Vector2i):
 # =========================
 
 func select_unit(unit_index: int):
+	
+	inspected_enemy = -1
 
 	var state = selection_system.select_unit(
 		units,

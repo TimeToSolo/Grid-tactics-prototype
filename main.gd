@@ -27,6 +27,7 @@ extends Node2D
 @onready var battle_setup = $BattleSetup
 @onready var combat_logic = $CombatLogic
 @onready var coverage_system = $CoverageSystem
+@onready var hover_query = $HoverQuery
 @onready var map_data = $MapData
 @onready var stamina_system = $StaminaSystem
 @onready var turn_manager = $TurnManager
@@ -432,7 +433,16 @@ func draw_coverage_preview():
 	if not has_pending_move():
 		return
 
-	if is_hovering_attackable_enemy():
+	if hover_query.is_hovering_attackable_enemy(
+		units,
+		selected_unit,
+		pending_move_cell,
+		hovered_cell,
+		has_pending_move(),
+		unit_logic,
+		unit_query,
+		map_data
+	):
 		return
 
 	var unit_class = units[selected_unit]["class"]
@@ -749,7 +759,16 @@ func draw_heal_confirmation_prompt():
 
 func draw_attack_hover_preview():
 
-	if not is_hovering_attackable_enemy():
+	if not hover_query.is_hovering_attackable_enemy(
+		units,
+		selected_unit,
+		pending_move_cell,
+		hovered_cell,
+		has_pending_move(),
+		unit_logic,
+		unit_query,
+		map_data
+	):
 		return
 
 	var rect = map_data.grid_rect(hovered_cell)
@@ -777,7 +796,16 @@ func draw_attack_hover_preview():
 
 func draw_heal_hover_preview():
 
-	if not is_hovering_healable_ally():
+	if not hover_query.is_hovering_healable_ally(
+		units,
+		selected_unit,
+		pending_move_cell,
+		hovered_cell,
+		has_pending_move(),
+		unit_logic,
+		unit_query,
+		map_data
+	):
 		return
 
 	var rect = map_data.grid_rect(hovered_cell)
@@ -1072,7 +1100,16 @@ func should_handle_facing_click(
 	):
 		return false
 
-	if is_hovering_attackable_enemy():
+	if hover_query.is_hovering_attackable_enemy(
+		units,
+		selected_unit,
+		pending_move_cell,
+		hovered_cell,
+		has_pending_move(),
+		unit_logic,
+		unit_query,
+		map_data
+	):
 		return false
 
 	if units[selected_unit]["class"] == "lancer":
@@ -1227,7 +1264,16 @@ func should_handle_attack_click(
 	if not has_pending_move():
 		return false
 
-	return is_hovering_attackable_enemy()
+	return hover_query.is_hovering_attackable_enemy(
+		units,
+		selected_unit,
+		pending_move_cell,
+		hovered_cell,
+		has_pending_move(),
+		unit_logic,
+		unit_query,
+		map_data
+	)
 
 
 # =========================
@@ -1248,7 +1294,16 @@ func should_handle_heal_click(
 	if units[selected_unit]["class"] != "healer":
 		return false
 
-	return is_hovering_healable_ally()
+	return hover_query.is_hovering_healable_ally(
+		units,
+		selected_unit,
+		pending_move_cell,
+		hovered_cell,
+		has_pending_move(),
+		unit_logic,
+		unit_query,
+		map_data
+	)
 
 
 # =========================
@@ -1864,88 +1919,6 @@ func auto_end_turn_if_needed():
 
 	queue_redraw()
 	
-
-# ==================================================
-# HOVER HELPERS
-# ==================================================
-
-# =========================
-# Returns true if hovering a valid attack target.
-# =========================
-
-func is_hovering_attackable_enemy() -> bool:
-
-	if selected_unit == -1:
-		return false
-
-	if not has_pending_move():
-		return false
-
-	var attack_tiles: Array[Vector2i] = []
-
-	if units[selected_unit]["class"] == "healer":
-		attack_tiles = unit_logic.get_adjacent_choice_tiles(
-			pending_move_cell,
-			map_data
-		)
-	else:
-		attack_tiles = unit_logic.get_attack_choice_tiles(
-			pending_move_cell,
-			units[selected_unit]["class"],
-			map_data
-		)
-
-	if not attack_tiles.has(hovered_cell):
-		return false
-
-	var hovered_unit = unit_query.get_unit_at(
-		units,
-		hovered_cell
-	)
-
-	return unit_query.is_enemy_unit(
-		units,
-		selected_unit,
-		hovered_unit
-	)
-
-
-# =========================
-# Returns true if hovering a healable ally.
-#
-# Uses healer support range, not lancer range.
-# =========================
-
-func is_hovering_healable_ally() -> bool:
-
-	if not unit_query.selected_unit_is_healer(
-		units,
-		selected_unit
-	):
-		return false
-
-	if not has_pending_move():
-		return false
-
-	var heal_tiles = unit_logic.get_heal_choice_tiles(
-		pending_move_cell,
-		map_data
-	)
-
-	if not heal_tiles.has(hovered_cell):
-		return false
-
-	var hovered_unit = unit_query.get_unit_at(
-		units,
-		hovered_cell
-	)
-
-	return unit_query.is_ally_unit(
-		units,
-		selected_unit,
-		hovered_unit
-	)
-
 
 # ==================================================
 # ARCHER HELPERS

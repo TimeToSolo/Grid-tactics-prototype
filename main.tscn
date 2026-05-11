@@ -18,6 +18,7 @@
 [ext_resource type="Script" uid="uid://dy6ogcgl2cmwl" path="res://movement_system.gd" id="16_2cqfq"]
 [ext_resource type="Script" uid="uid://dtp4k1c2d8fel" path="res://selection_system.gd" id="17_yaehf"]
 [ext_resource type="Script" uid="uid://bth32tvcgqp75" path="res://path_preview_system.gd" id="18_074og"]
+[ext_resource type="Script" uid="uid://nttnhly4fbm2" path="res://editor_system.gd" id="19_cegan"]
 
 [node name="Main" type="Node2D" unique_id=370152938]
 script = ExtResource("1_ig7tw")
@@ -72,3 +73,6 @@ script = ExtResource("17_yaehf")
 
 [node name="PathPreviewSystem" type="Node" parent="." unique_id=127527219]
 script = ExtResource("18_074og")
+
+[node name="EditorSystem" type="Node" parent="." unique_id=1184078650]
+script = ExtResource("19_cegan")

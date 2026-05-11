@@ -29,6 +29,7 @@ extends Node2D
 @onready var battle_setup = $BattleSetup
 @onready var combat_logic = $CombatLogic
 @onready var coverage_system = $CoverageSystem
+@onready var editor_system = $EditorSystem
 @onready var hover_query = $HoverQuery
 @onready var map_data = $MapData
 @onready var movement_system = $MovementSystem
@@ -89,6 +90,22 @@ var hover_path_cells: Array[Vector2i] = []
 # Inspect enemy variable
 var inspected_enemy := -1
 
+# ==================================================
+# LEVEL EDITOR STATE
+# ==================================================
+
+# True while level editor mode is active.
+var editor_mode := false
+
+# Currently selected terrain tile symbol
+# used for painting terrain.
+var selected_editor_tile := "."
+
+# True while dragging a rectangle fill area.
+var editor_rect_dragging := false
+
+# Starting cell for Ctrl + left-click rectangle fill.
+var editor_rect_start_cell: Vector2i = Vector2i(-1, -1)
 
 # ==================================================
 # ATTACK / HEAL STATE
@@ -126,6 +143,106 @@ var coverage_mode = 0
 
 # Current displayed turn number.
 var turn_number = 1
+
+# =========================
+# Draws editor mode controls
+# and highlights selected tile.
+# =========================
+
+func draw_editor_ui():
+
+	if not editor_mode:
+		return
+
+	var x = 12
+	var y = 32
+	var font_size = 16
+	var spacing = 95
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(x, y),
+		"EDITOR MODE |",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_size,
+		Color.WHITE
+	)
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(x + spacing * 2, y),
+		"[1] Grass",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_size,
+		Color.YELLOW if selected_editor_tile == "." else Color.WHITE
+	)
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(x + spacing * 3, y),
+		"[2] Wall",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_size,
+		Color.YELLOW if selected_editor_tile == "W" else Color.WHITE
+	)
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(x + spacing * 4, y),
+		"[3] River",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_size,
+		Color.YELLOW if selected_editor_tile == "R" else Color.WHITE
+	)
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(x + spacing * 5, y),
+		"[E] Exit",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_size,
+		Color.WHITE
+	)
+
+# =========================
+# Draws rectangle fill preview
+# while Ctrl-dragging in editor mode.
+# =========================
+
+func draw_editor_rect_preview():
+
+	if not editor_mode:
+		return
+
+	if not editor_rect_dragging:
+		return
+
+	if editor_rect_start_cell == Vector2i(-1, -1):
+		return
+
+	var min_x = min(editor_rect_start_cell.x, hovered_cell.x)
+	var max_x = max(editor_rect_start_cell.x, hovered_cell.x)
+
+	var min_y = min(editor_rect_start_cell.y, hovered_cell.y)
+	var max_y = max(editor_rect_start_cell.y, hovered_cell.y)
+
+	for y in range(min_y, max_y + 1):
+		for x in range(min_x, max_x + 1):
+
+			var cell = Vector2i(x, y)
+
+			if not map_data.is_inside_grid(cell):
+				continue
+
+			draw_rect(
+				map_data.grid_rect(cell),
+				Color(1.0, 1.0, 0.0, 0.35)
+			)
 
 # ==================================================
 # RENDERING
@@ -267,11 +384,13 @@ func _draw():
 		has_pending_move()
 	)
 
-	render_system.draw_turn_indicator(
-		self,
-		turn_manager,
-		turn_number
-	)
+	if not editor_mode:
+
+		render_system.draw_turn_indicator(
+			self,
+			turn_manager,
+			turn_number
+		)
 
 	render_system.draw_wait_confirmation_prompt(
 		self,
@@ -287,7 +406,9 @@ func _draw():
 		self,
 		awaiting_heal_confirmation
 	)
-	
+
+	draw_editor_rect_preview()
+	draw_editor_ui()
 
 
 # =========================
@@ -380,16 +501,38 @@ func _process(_delta):
 
 	hovered_cell = map_data.world_to_grid(mouse_pos)
 
-	hover_path_cells = path_preview_system.update_hover_path(
-		hover_path_cells,
-		map_data,
-		units,
-		unit_query,
-		selected_unit,
-		selected_unit_start_cell,
-		hovered_cell,
-		move_tiles
-	)
+	# =========================
+	# Editor drag painting
+	# =========================
+
+	if (
+		editor_mode
+		and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+		and not Input.is_key_pressed(KEY_CTRL)
+		and not editor_rect_dragging
+	):
+		editor_system.paint_tile(
+			map_data,
+			hovered_cell,
+			selected_editor_tile
+		)
+
+	# =========================
+	# Normal movement path preview
+	# =========================
+
+	if not editor_mode:
+
+		hover_path_cells = path_preview_system.update_hover_path(
+			hover_path_cells,
+			map_data,
+			units,
+			unit_query,
+			selected_unit,
+			selected_unit_start_cell,
+			hovered_cell,
+			move_tiles
+		)
 
 	queue_redraw()
 
@@ -413,7 +556,8 @@ func _input(event):
 # ==================================================
 
 # =========================
-# Handles keyboard shortcuts and confirmations.
+# Handles keyboard shortcuts,
+# confirmations, and editor hotkeys.
 # =========================
 
 func handle_keyboard_input(event):
@@ -425,6 +569,22 @@ func handle_keyboard_input(event):
 		return
 
 	match event.keycode:
+
+		KEY_E:
+			editor_mode = !editor_mode
+
+			clear_pending_action_state()
+
+			queue_redraw()
+
+		KEY_1:
+			selected_editor_tile = "."
+
+		KEY_2:
+			selected_editor_tile = "W"
+
+		KEY_3:
+			selected_editor_tile = "R"
 
 		KEY_C:
 			cycle_coverage_mode()
@@ -549,16 +709,31 @@ func handle_mouse_input(event):
 	if not event is InputEventMouseButton:
 		return
 
-	if not event.pressed:
-		return
-
 	# =========================
-	# Right click = cancel / deselect
+	# Right click behavior
 	# =========================
 
 	if event.button_index == MOUSE_BUTTON_RIGHT:
 
+		# =========================
+		# Editor mode terrain erase
+		# =========================
+
+		if editor_mode:
+
+			editor_system.paint_tile(
+				map_data,
+				hovered_cell,
+				"."
+			)
+
+			queue_redraw()
+			return
+
+		# =========================
 		# Clear inspected enemy first
+		# =========================
+
 		if inspected_enemy != -1:
 			inspected_enemy = -1
 			queue_redraw()
@@ -575,7 +750,44 @@ func handle_mouse_input(event):
 	# =========================
 
 	if event.button_index == MOUSE_BUTTON_LEFT:
-		handle_left_click()
+
+		if editor_mode:
+
+			if event.pressed:
+
+				if event.ctrl_pressed:
+					editor_rect_dragging = true
+					editor_rect_start_cell = hovered_cell
+					return
+
+				editor_system.paint_tile(
+					map_data,
+					hovered_cell,
+					selected_editor_tile
+				)
+
+				queue_redraw()
+				return
+
+			if not event.pressed:
+
+				if editor_rect_dragging:
+
+					editor_system.fill_rect(
+						map_data,
+						editor_rect_start_cell,
+						hovered_cell,
+						selected_editor_tile
+					)
+
+					editor_rect_dragging = false
+					editor_rect_start_cell = Vector2i(-1, -1)
+
+					queue_redraw()
+					return
+
+		if event.pressed:
+			handle_left_click()
 
 
 # =========================
@@ -587,6 +799,21 @@ func handle_left_click():
 	var clicked_cell = hovered_cell
 
 	if not map_data.is_inside_grid(clicked_cell):
+		return
+
+	# =========================
+	# Editor mode terrain painting
+	# =========================
+
+	if editor_mode:
+
+		editor_system.paint_tile(
+			map_data,
+			clicked_cell,
+			selected_editor_tile
+		)
+
+		queue_redraw()
 		return
 
 	if selected_unit != -1 and has_pending_move():

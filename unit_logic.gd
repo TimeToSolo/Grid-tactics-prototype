@@ -111,6 +111,53 @@ func get_attack_tiles(
 
 	return tiles
 
+# =========================
+# Builds attack tiles from
+# an already validated
+# movement tile list.
+#
+# Prevents attack previews
+# from ignoring blockers.
+# =========================
+
+func get_attack_tiles_from_move_tiles(
+	move_tiles_local: Array[Vector2i],
+	unit_class: String,
+	map_data
+) -> Array[Vector2i]:
+
+	var tiles: Array[Vector2i] = []
+
+	for move_tile in move_tiles_local:
+
+		if is_adjacent_attacker(unit_class):
+
+			add_adjacent_attack_tiles(
+				tiles,
+				move_tile,
+				move_tiles_local,
+				map_data
+			)
+
+		elif unit_class == "lancer":
+
+			add_lancer_attack_tiles(
+				tiles,
+				move_tile,
+				move_tiles_local,
+				map_data
+			)
+
+		elif unit_class == "archer":
+
+			add_archer_attack_tiles(
+				tiles,
+				move_tile,
+				move_tiles_local,
+				map_data
+			)
+
+	return tiles
 
 # =========================
 # Returns attack targeting tiles from a specific center tile.
@@ -400,6 +447,25 @@ func get_limited_facing_dirs(move_dir: Vector2i) -> Array[Vector2i]:
 
 	return allowed
 
+# =========================
+# Returns all possible facing directions.
+#
+# Used when a unit did not spend
+# its full movement range.
+# =========================
+
+func get_all_facing_dirs() -> Array[Vector2i]:
+
+	return [
+		Vector2i(-1, -1),
+		Vector2i(0, -1),
+		Vector2i(1, -1),
+		Vector2i(-1, 0),
+		Vector2i(1, 0),
+		Vector2i(-1, 1),
+		Vector2i(0, 1),
+		Vector2i(1, 1)
+	]
 
 # =========================
 # Returns valid facing tiles around a pending destination.

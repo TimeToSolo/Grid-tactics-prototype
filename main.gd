@@ -260,9 +260,8 @@ func draw_attack_range():
 
 	else:
 
-		attack_tiles = unit_logic.get_attack_tiles(
-			unit["pos"],
-			unit["move"],
+		attack_tiles = unit_logic.get_attack_tiles_from_move_tiles(
+			move_tiles,
 			unit_class,
 			map_data
 		)
@@ -1134,9 +1133,14 @@ func get_valid_lancer_facing_tiles() -> Array[Vector2i]:
 		map_data
 	)
 
-	var allowed_dirs = unit_logic.get_limited_facing_dirs(
-		pending_move_direction
-	)
+	var allowed_dirs: Array[Vector2i] = []
+
+	if used_max_movement():
+		allowed_dirs = unit_logic.get_limited_facing_dirs(
+			pending_move_direction
+		)
+	else:
+		allowed_dirs = unit_logic.get_all_facing_dirs()
 
 	for cell in lancer_tiles:
 
@@ -1509,6 +1513,24 @@ func has_pending_move() -> bool:
 
 	return pending_move_cell != Vector2i(-1, -1)
 	
+# =========================
+# Returns true if the selected unit
+# used its full movement range.
+#
+# Full movement limits facing so the
+# unit cannot fully turn around.
+# =========================
+
+func used_max_movement() -> bool:
+
+	if selected_unit == -1:
+		return false
+
+	if not has_pending_move():
+		return false
+
+	return pending_move_distance >= units[selected_unit]["move"]
+
 # ==================================================
 # ACTION CONFIRMATION FLOW
 # ==================================================
@@ -1802,9 +1824,6 @@ func has_active_coverage(unit_index: int) -> bool:
 	if unit["facing"] == Vector2i.ZERO:
 		return false
 
-	if unit["reaction_used"]:
-		return false
-
 	if unit["stamina"] < unit["counter_stamina_cost"]:
 		return false
 
@@ -1897,8 +1916,6 @@ func resolve_coverage_reaction(
 	moving_unit: int,
 	covering_unit: int
 ) -> bool:
-
-	units[covering_unit]["reaction_used"] = true
 
 	units[covering_unit]["stamina"] = max(
 		units[covering_unit]["stamina"]

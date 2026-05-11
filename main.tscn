@@ -11,6 +11,7 @@
 [ext_resource type="Script" uid="uid://bwvq86q8yyd87" path="res://stamina_system.gd" id="9_kek77"]
 [ext_resource type="Script" uid="uid://c370vtr3h2wbj" path="res://coverage_system.gd" id="10_4c57u"]
 [ext_resource type="Script" uid="uid://cu4v30e8i8x3h" path="res://hover_query.gd" id="11_efxa6"]
+[ext_resource type="Script" uid="uid://se1868nklb5k" path="res://action_query.gd" id="12_dg77c"]
 
 [node name="Main" type="Node2D" unique_id=370152938]
 script = ExtResource("1_ig7tw")
@@ -44,3 +45,6 @@ script = ExtResource("10_4c57u")
 
 [node name="HoverQuery" type="Node" parent="." unique_id=1251015729]
 script = ExtResource("11_efxa6")
+
+[node name="ActionQuery" type="Node" parent="." unique_id=171700439]
+script = ExtResource("12_dg77c")

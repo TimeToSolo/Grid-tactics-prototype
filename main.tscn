@@ -15,6 +15,7 @@
 [ext_resource type="Script" uid="uid://b1khr0iem0br" path="res://selection_state.gd" id="13_ycdy4"]
 [ext_resource type="Script" uid="uid://c4tuj8d0ha1il" path="res://render_system.gd" id="14_w48qg"]
 [ext_resource type="Script" uid="uid://t36geu420ahg" path="res://action_system.gd" id="15_vivmo"]
+[ext_resource type="Script" uid="uid://dy6ogcgl2cmwl" path="res://movement_system.gd" id="16_2cqfq"]
 
 [node name="Main" type="Node2D" unique_id=370152938]
 script = ExtResource("1_ig7tw")
@@ -61,4 +62,5 @@ script = ExtResource("14_w48qg")
 [node name="ActionSystem" type="Node" parent="." unique_id=514510247]
 script = ExtResource("15_vivmo")
 
-[node name="Node" type="Node" parent="." unique_id=1953195263]
+[node name="MovementSystem" type="Node" parent="." unique_id=1953195263]
+script = ExtResource("16_2cqfq")

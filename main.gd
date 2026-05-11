@@ -31,6 +31,7 @@ extends Node2D
 @onready var coverage_system = $CoverageSystem
 @onready var hover_query = $HoverQuery
 @onready var map_data = $MapData
+@onready var movement_system = $MovementSystem
 @onready var render_system = $RenderSystem
 @onready var selection_state = $SelectionState
 @onready var stamina_system = $StaminaSystem
@@ -627,34 +628,14 @@ func handle_left_click():
 
 func get_valid_lancer_facing_tiles() -> Array[Vector2i]:
 
-	var valid_tiles: Array[Vector2i] = []
-
-	var lancer_tiles = unit_logic.get_attack_choice_tiles(
+	return movement_system.get_valid_lancer_facing_tiles(
+		unit_logic,
+		action_query,
+		map_data,
 		pending_move_cell,
-		"lancer",
-		map_data
+		pending_move_direction,
+		used_max_movement()
 	)
-
-	var allowed_dirs: Array[Vector2i] = []
-
-	if used_max_movement():
-		allowed_dirs = unit_logic.get_limited_facing_dirs(
-			pending_move_direction
-		)
-	else:
-		allowed_dirs = unit_logic.get_all_facing_dirs()
-
-	for cell in lancer_tiles:
-
-		var facing = action_query.get_lancer_facing_from_target(
-			pending_move_cell,
-			cell
-		)
-
-		if allowed_dirs.has(facing):
-			valid_tiles.append(cell)
-
-	return valid_tiles
 
 # =========================
 # Clears selection and pending movement state.
@@ -790,45 +771,28 @@ func select_unit(unit_index: int):
 
 func handle_move_tile_click(clicked_cell: Vector2i):
 
-	if selected_unit == -1:
-		return
-
-	if unit_query.is_tile_occupied(
+	var result = movement_system.handle_move_tile_click(
 		units,
-		clicked_cell
-	) and clicked_cell != units[selected_unit]["pos"]:
-		return
-
-	var start = selected_unit_start_cell
-
-	pending_move_cell = clicked_cell
-
-	pending_coverage_enemies = coverage_system.get_enemies_entered_coverage(
-		units,
+		unit_query,
+		coverage_system,
 		unit_logic,
+		map_data,
 		selected_unit,
 		selected_unit_start_cell,
-		clicked_cell
+		clicked_cell,
+		move_tiles
 	)
 
-	units[selected_unit]["pos"] = pending_move_cell
+	if result.is_empty():
+		return
 
-	pending_facing = Vector2i.ZERO
-
-	pending_move_distance = map_data.get_grid_distance(
-		start,
-		clicked_cell
-	)
-
-	pending_move_direction = map_data.get_primary_direction(
-		start,
-		clicked_cell
-	)
-
-	move_tiles.clear()
+	pending_move_cell = result["pending_move_cell"]
+	pending_facing = result["pending_facing"]
+	pending_move_distance = result["pending_move_distance"]
+	pending_move_direction = result["pending_move_direction"]
+	pending_coverage_enemies = result["pending_coverage_enemies"]
 
 	queue_redraw()
-
 
 # =========================
 # Handles clicking a valid facing tile.
@@ -839,59 +803,36 @@ func handle_move_tile_click(clicked_cell: Vector2i):
 
 func handle_facing_click(clicked_cell: Vector2i):
 
-	if selected_unit == -1:
-		return
-
-	if not has_pending_move():
-		return
-
-	var valid_facing_click = false
-
-	if units[selected_unit]["class"] == "lancer":
-		valid_facing_click = get_valid_lancer_facing_tiles().has(clicked_cell)
-	else:
-		var facing_tiles = unit_logic.get_facing_choice_tiles(
-			pending_move_cell,
-			pending_move_distance,
-			pending_move_direction,
-			units[selected_unit]["move"],
-			map_data
-		)
-
-		valid_facing_click = facing_tiles.has(clicked_cell)
-
-	if not valid_facing_click:
-		return
-
-	if units[selected_unit]["class"] == "lancer":
-		pending_facing = action_query.get_lancer_facing_from_target(
-			pending_move_cell,
-			clicked_cell
-		)
-	else:
-		pending_facing = clicked_cell - pending_move_cell
-
-	units[selected_unit]["facing"] = pending_facing
-	units[selected_unit]["has_acted"] = true
-
-	if coverage_system.resolve_pending_coverage_if_needed(
+	var result = movement_system.handle_facing_click(
 		units,
 		combat_logic,
+		coverage_system,
+		stamina_system,
+		unit_logic,
+		action_query,
+		map_data,
 		selected_unit,
-		pending_coverage_enemies
-	):
-		units.remove_at(selected_unit)
+		clicked_cell,
+		pending_move_cell,
+		pending_move_distance,
+		pending_move_direction,
+		pending_coverage_enemies,
+		get_valid_lancer_facing_tiles()
+	)
+
+	if result.is_empty():
+		return
+
+	pending_facing = result["pending_facing"]
+
+	if result["unit_died"]:
+		units.remove_at(result["remove_index"])
 		clear_selection()
 		queue_redraw()
 		return
 
-	stamina_system.spend_movement_stamina(
-		units,
-		selected_unit,
-		pending_move_distance
-	)
-
 	clear_selection()
+
 	turn_number = action_system.auto_end_turn_if_needed(
 		units,
 		turn_manager,

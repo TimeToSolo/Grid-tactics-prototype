@@ -25,6 +25,7 @@ extends Node2D
 # ==================================================
 
 @onready var action_query = $ActionQuery
+@onready var action_system = $ActionSystem
 @onready var battle_setup = $BattleSetup
 @onready var combat_logic = $CombatLogic
 @onready var coverage_system = $CoverageSystem
@@ -482,7 +483,17 @@ func handle_left_click():
 	if selected_unit != -1 and has_pending_move():
 
 		if clicked_cell == pending_move_cell:
-			start_wait_confirmation()
+
+			var state = action_system.start_wait_confirmation()
+
+			awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
+			awaiting_attack_confirmation = state["awaiting_attack_confirmation"]
+			awaiting_heal_confirmation = state["awaiting_heal_confirmation"]
+
+			pending_attack_target = state["pending_attack_target"]
+			pending_heal_target = state["pending_heal_target"]
+
+			queue_redraw()
 			return
 
 		if action_query.should_handle_heal_click(
@@ -496,7 +507,25 @@ func handle_left_click():
 			hover_query,
 			map_data
 		):
-			handle_heal_click(clicked_cell)
+			var state = action_system.get_heal_confirmation_state(
+				units,
+				selected_unit,
+				clicked_cell,
+				unit_query
+			)
+
+			if not state.is_empty():
+
+				pending_heal_target = state["pending_heal_target"]
+
+				awaiting_heal_confirmation = state["awaiting_heal_confirmation"]
+				awaiting_attack_confirmation = state["awaiting_attack_confirmation"]
+				awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
+
+				pending_attack_target = state["pending_attack_target"]
+
+				queue_redraw()
+
 			return
 
 		if action_query.should_handle_attack_click(
@@ -510,7 +539,25 @@ func handle_left_click():
 			hover_query,
 			map_data
 		):
-			handle_attack_click(clicked_cell)
+			var state = action_system.get_attack_confirmation_state(
+				units,
+				selected_unit,
+				clicked_cell,
+				unit_query
+			)
+
+			if not state.is_empty():
+
+				pending_attack_target = state["pending_attack_target"]
+
+				awaiting_attack_confirmation = state["awaiting_attack_confirmation"]
+				awaiting_heal_confirmation = state["awaiting_heal_confirmation"]
+				awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
+
+				pending_heal_target = state["pending_heal_target"]
+
+				queue_redraw()
+
 			return
 
 		if (
@@ -529,7 +576,16 @@ func handle_left_click():
 				or units[selected_unit]["class"] == "healer"
 			)
 		):
-			start_wait_confirmation()
+			var state = action_system.start_wait_confirmation()
+
+			awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
+			awaiting_attack_confirmation = state["awaiting_attack_confirmation"]
+			awaiting_heal_confirmation = state["awaiting_heal_confirmation"]
+
+			pending_attack_target = state["pending_attack_target"]
+			pending_heal_target = state["pending_heal_target"]
+
+			queue_redraw()
 			return
 
 		if action_query.should_handle_facing_click(
@@ -839,99 +895,6 @@ func handle_facing_click(clicked_cell: Vector2i):
 	auto_end_turn_if_needed()
 
 	queue_redraw()
-
-
-# =========================
-# Starts wait confirmation.
-# =========================
-
-func start_wait_confirmation():
-
-	awaiting_wait_confirmation = true
-	awaiting_attack_confirmation = false
-	awaiting_heal_confirmation = false
-
-	pending_attack_target = -1
-	pending_heal_target = -1
-
-	queue_redraw()
-
-# ==================================================
-# ACTION CONFIRMATION FLOW
-# ==================================================
-
-# =========================
-# Starts attack confirmation against an enemy unit.
-# =========================
-
-func start_attack_confirmation(target_unit: int):
-
-	pending_attack_target = target_unit
-
-	awaiting_attack_confirmation = true
-	awaiting_heal_confirmation = false
-	awaiting_wait_confirmation = false
-
-	pending_heal_target = -1
-
-	queue_redraw()
-
-
-# =========================
-# Starts heal/regeneration confirmation
-# on an allied unit.
-# =========================
-
-func start_heal_confirmation(target_unit: int):
-
-	pending_heal_target = target_unit
-
-	awaiting_heal_confirmation = true
-	awaiting_attack_confirmation = false
-	awaiting_wait_confirmation = false
-
-	pending_attack_target = -1
-
-	queue_redraw()
-
-
-# =========================
-# Handles clicking an enemy attack target.
-# =========================
-
-func handle_attack_click(clicked_cell: Vector2i):
-
-	var clicked_unit = unit_query.get_unit_at(
-		units,
-		clicked_cell
-	)
-
-	if unit_query.is_enemy_unit(
-		units,
-		selected_unit,
-		clicked_unit
-	):
-		start_attack_confirmation(clicked_unit)
-
-
-# =========================
-# Handles clicking an allied heal target.
-# =========================
-
-func handle_heal_click(clicked_cell: Vector2i):
-
-	var clicked_unit = unit_query.get_unit_at(
-		units,
-		clicked_cell
-	)
-
-	if unit_query.is_ally_unit(
-		units,
-		selected_unit,
-		clicked_unit
-	):
-		start_heal_confirmation(clicked_unit)
-
 
 # =========================
 # Confirms pending attack.

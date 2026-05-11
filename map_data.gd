@@ -321,6 +321,92 @@ func get_move_range(
 
 	return reached
 
+# =========================
+# Returns actual movement path data
+# from start to target.
+#
+# Used when direct grid distance is
+# not enough because walls/terrain may
+# force a longer path.
+#
+# Returns:
+# - cost: actual movement cost spent
+# - final_direction: direction of last step
+# =========================
+
+func get_movement_path_data(
+	start: Vector2i,
+	target: Vector2i,
+	move_points: int,
+	occupied_tiles: Array[Vector2i] = []
+) -> Dictionary:
+
+	var frontier = [{
+		"cell": start,
+		"cost": 0,
+		"previous": start
+	}]
+
+	var visited = {
+		start: {
+			"cost": 0,
+			"previous": start
+		}
+	}
+
+	var dirs = [
+		Vector2i(1, 0),
+		Vector2i(-1, 0),
+		Vector2i(0, 1),
+		Vector2i(0, -1)
+	]
+
+	while frontier.size() > 0:
+
+		var current = frontier.pop_front()
+
+		if current["cell"] == target:
+
+			var previous_cell = current["previous"]
+			var final_direction = current["cell"] - previous_cell
+
+			return {
+				"cost": current["cost"],
+				"final_direction": final_direction
+			}
+
+		for dir in dirs:
+
+			var next = current["cell"] + dir
+			var next_cost = current["cost"] + 1
+
+			if not is_inside_grid(next):
+				continue
+
+			if blocks_movement(next):
+				continue
+
+			if occupied_tiles.has(next):
+				continue
+
+			if visited.has(next):
+				continue
+
+			if next_cost > move_points:
+				continue
+
+			visited[next] = {
+				"cost": next_cost,
+				"previous": current["cell"]
+			}
+
+			frontier.append({
+				"cell": next,
+				"cost": next_cost,
+				"previous": current["cell"]
+			})
+
+	return {}
 
 # ==================================================
 # ATTACK LINE OF SIGHT

@@ -644,18 +644,17 @@ func get_valid_lancer_facing_tiles() -> Array[Vector2i]:
 
 func clear_selection():
 
-	selected_unit = -1
-	selected_unit_start_cell = Vector2i(-1, -1)
+	var state = selection_system.clear_selection()
 
-	move_tiles.clear()
+	selected_unit = state["selected_unit"]
+	selected_unit_start_cell = state["selected_unit_start_cell"]
+	move_tiles = state["move_tiles"]
 
-	pending_move_cell = Vector2i(-1, -1)
-	pending_facing = Vector2i.ZERO
-	pending_move_distance = 0
-	pending_move_direction = Vector2i.ZERO
-
-	pending_coverage_enemies.clear()
-
+	pending_move_cell = state["pending_move_cell"]
+	pending_facing = state["pending_facing"]
+	pending_move_distance = state["pending_move_distance"]
+	pending_move_direction = state["pending_move_direction"]
+	pending_coverage_enemies = state["pending_coverage_enemies"]
 
 # =========================
 # Clears pending action confirmation state.
@@ -669,14 +668,24 @@ func clear_pending_action_state():
 	if selected_unit != -1 and has_pending_move():
 		units[selected_unit]["pos"] = selected_unit_start_cell
 
-	awaiting_attack_confirmation = false
-	awaiting_heal_confirmation = false
-	awaiting_wait_confirmation = false
+	var state = selection_system.clear_pending_action_state()
 
-	pending_attack_target = -1
-	pending_heal_target = -1
+	selected_unit = state["selected_unit"]
+	selected_unit_start_cell = state["selected_unit_start_cell"]
+	move_tiles = state["move_tiles"]
 
-	clear_selection()
+	pending_move_cell = state["pending_move_cell"]
+	pending_facing = state["pending_facing"]
+	pending_move_distance = state["pending_move_distance"]
+	pending_move_direction = state["pending_move_direction"]
+	pending_coverage_enemies = state["pending_coverage_enemies"]
+
+	awaiting_attack_confirmation = state["awaiting_attack_confirmation"]
+	awaiting_heal_confirmation = state["awaiting_heal_confirmation"]
+	awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
+
+	pending_attack_target = state["pending_attack_target"]
+	pending_heal_target = state["pending_heal_target"]
 
 # ==================================================
 # SELECTION / MOVEMENT FLOW

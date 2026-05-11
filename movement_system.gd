@@ -194,15 +194,21 @@ func handle_move_tile_click(
 
 	units[selected_unit]["pos"] = pending_move_cell
 
-	var pending_move_distance = map_data.get_grid_distance(
+	var path_data = map_data.get_movement_path_data(
 		start,
-		clicked_cell
+		clicked_cell,
+		units[selected_unit]["move"],
+		unit_query.get_enemy_occupied_tiles(
+			units,
+			selected_unit
+		)
 	)
 
-	var pending_move_direction = map_data.get_primary_direction(
-		start,
-		clicked_cell
-	)
+	if path_data.is_empty():
+		return {}
+
+	var pending_move_distance = path_data["cost"]
+	var pending_move_direction = path_data["final_direction"]
 
 	move_tiles.clear()
 

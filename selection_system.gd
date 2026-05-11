@@ -103,3 +103,43 @@ func handle_unit_click(
 		"select_unit": true,
 		"selected_unit_index": clicked_unit
 	}
+
+# =========================
+# Clears selection and pending movement state.
+#
+# Returns cleared selection state.
+# =========================
+
+func clear_selection() -> Dictionary:
+
+	return {
+		"selected_unit": -1,
+		"selected_unit_start_cell": Vector2i(-1, -1),
+		"move_tiles": [] as Array[Vector2i],
+
+		"pending_move_cell": Vector2i(-1, -1),
+		"pending_facing": Vector2i.ZERO,
+		"pending_move_distance": 0,
+		"pending_move_direction": Vector2i.ZERO,
+		"pending_coverage_enemies": [] as Array[int]
+	}
+
+
+# =========================
+# Clears pending action confirmation state.
+#
+# Returns cleared pending action state.
+# =========================
+
+func clear_pending_action_state() -> Dictionary:
+
+	var state = clear_selection()
+
+	state["awaiting_attack_confirmation"] = false
+	state["awaiting_heal_confirmation"] = false
+	state["awaiting_wait_confirmation"] = false
+
+	state["pending_attack_target"] = -1
+	state["pending_heal_target"] = -1
+
+	return state

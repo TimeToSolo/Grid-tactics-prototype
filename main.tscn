@@ -9,6 +9,7 @@
 [ext_resource type="Script" uid="uid://dtmckp0axqj56" path="res://battle_setup.gd" id="7_272bh"]
 [ext_resource type="Script" uid="uid://daxpo50rrva8j" path="res://unit_query.gd" id="8_5vw27"]
 [ext_resource type="Script" uid="uid://bwvq86q8yyd87" path="res://stamina_system.gd" id="9_kek77"]
+[ext_resource type="Script" uid="uid://c370vtr3h2wbj" path="res://coverage_system.gd" id="10_4c57u"]
 
 [node name="Main" type="Node2D" unique_id=370152938]
 script = ExtResource("1_ig7tw")
@@ -36,3 +37,6 @@ script = ExtResource("8_5vw27")
 
 [node name="StaminaSystem" type="Node" parent="." unique_id=97320835]
 script = ExtResource("9_kek77")
+
+[node name="CoverageSystem" type="Node" parent="." unique_id=938230758]
+script = ExtResource("10_4c57u")

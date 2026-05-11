@@ -26,6 +26,7 @@ extends Node2D
 
 @onready var battle_setup = $BattleSetup
 @onready var combat_logic = $CombatLogic
+@onready var coverage_system = $CoverageSystem
 @onready var map_data = $MapData
 @onready var stamina_system = $StaminaSystem
 @onready var turn_manager = $TurnManager
@@ -358,7 +359,10 @@ func draw_all_coverage():
 		if coverage_mode == 2 and team != "enemy":
 			continue
 
-		if not has_active_coverage(i):
+		if not coverage_system.has_active_coverage(
+			units,
+			i
+		):
 			continue
 
 		var pos = unit["pos"]
@@ -1352,7 +1356,9 @@ func handle_move_tile_click(clicked_cell: Vector2i):
 
 	pending_move_cell = clicked_cell
 
-	pending_coverage_enemies = get_enemies_entered_coverage(
+	pending_coverage_enemies = coverage_system.get_enemies_entered_coverage(
+		units,
+		unit_logic,
 		selected_unit,
 		selected_unit_start_cell,
 		clicked_cell
@@ -1421,7 +1427,12 @@ func handle_facing_click(clicked_cell: Vector2i):
 	units[selected_unit]["facing"] = pending_facing
 	units[selected_unit]["has_acted"] = true
 
-	if resolve_pending_coverage_if_needed():
+	if coverage_system.resolve_pending_coverage_if_needed(
+		units,
+		combat_logic,
+		selected_unit,
+		pending_coverage_enemies
+	):
 		units.remove_at(selected_unit)
 		clear_selection()
 		queue_redraw()
@@ -1628,7 +1639,12 @@ func confirm_attack():
 	units[selected_unit]["facing"] = attack_direction
 	units[selected_unit]["has_acted"] = true
 
-	if resolve_pending_coverage_if_needed():
+	if coverage_system.resolve_pending_coverage_if_needed(
+		units,
+		combat_logic,
+		selected_unit,
+		pending_coverage_enemies
+	):
 
 		units.remove_at(selected_unit)
 		clear_selection()
@@ -1682,7 +1698,12 @@ func confirm_wait():
 
 	units[selected_unit]["has_acted"] = true
 
-	if resolve_pending_coverage_if_needed():
+	if coverage_system.resolve_pending_coverage_if_needed(
+		units,
+		combat_logic,
+		selected_unit,
+		pending_coverage_enemies
+	):
 
 		units.remove_at(selected_unit)
 		clear_selection()
@@ -1720,7 +1741,12 @@ func confirm_heal():
 
 	var dead_index = selected_unit
 
-	if resolve_pending_coverage_if_needed():
+	if coverage_system.resolve_pending_coverage_if_needed(
+		units,
+		combat_logic,
+		selected_unit,
+		pending_coverage_enemies
+	):
 
 		units.remove_at(dead_index)
 		clear_selection()
@@ -1772,7 +1798,12 @@ func confirm_regen():
 
 	var dead_index = selected_unit
 
-	if resolve_pending_coverage_if_needed():
+	if coverage_system.resolve_pending_coverage_if_needed(
+		units,
+		combat_logic,
+		selected_unit,
+		pending_coverage_enemies
+	):
 
 		units.remove_at(dead_index)
 		clear_selection()
@@ -1833,128 +1864,6 @@ func auto_end_turn_if_needed():
 
 	queue_redraw()
 	
-# =========================
-# Returns true if a unit currently has active coverage.
-#
-# Coverage requires:
-# - a valid facing direction
-# - enough stamina remaining
-# - reaction not already used
-# =========================
-
-func has_active_coverage(unit_index: int) -> bool:
-
-	var unit = units[unit_index]
-
-	if unit["facing"] == Vector2i.ZERO:
-		return false
-
-	if unit["stamina"] < unit["counter_stamina_cost"]:
-		return false
-
-	return true
-
-
-# =========================
-# Returns all enemies whose coverage
-# the moving unit ENTERED.
-#
-# Does not trigger if:
-# - the unit started inside that same coverage
-# - the unit moves out of coverage
-# - the unit stands still inside coverage
-# =========================
-
-func get_enemies_entered_coverage(
-	unit_index: int,
-	start_cell: Vector2i,
-	target_cell: Vector2i
-) -> Array[int]:
-
-	var covering_enemies: Array[int] = []
-
-	var moving_team = units[unit_index]["team"]
-
-	for i in range(units.size()):
-
-		if units[i]["team"] == moving_team:
-			continue
-
-		if not has_active_coverage(i):
-			continue
-
-		var covered_tiles = unit_logic.get_coverage_tiles(
-			units[i]["class"],
-			units[i]["pos"],
-			units[i]["facing"]
-		)
-
-		var started_in_coverage = covered_tiles.has(start_cell)
-		var ended_in_coverage = covered_tiles.has(target_cell)
-
-		if ended_in_coverage and not started_in_coverage:
-			covering_enemies.append(i)
-
-	return covering_enemies
-
-
-# =========================
-# Resolves delayed coverage damage.
-#
-# Multiple overlapping coverage zones
-# each resolve individually.
-#
-# Returns:
-# - true if selected unit dies
-# - false otherwise
-# =========================
-
-func resolve_pending_coverage_if_needed() -> bool:
-
-	if pending_coverage_enemies.is_empty():
-		return false
-
-	for covering_enemy in pending_coverage_enemies:
-
-		var unit_died = resolve_coverage_reaction(
-			selected_unit,
-			covering_enemy
-		)
-
-		if unit_died:
-			pending_coverage_enemies.clear()
-			return true
-
-	pending_coverage_enemies.clear()
-
-	return false
-
-
-# =========================
-# Resolves a coverage reaction attack.
-#
-# The covering unit spends stamina
-# to perform the reaction attack.
-# =========================
-
-func resolve_coverage_reaction(
-	moving_unit: int,
-	covering_unit: int
-) -> bool:
-
-	units[covering_unit]["stamina"] = max(
-		units[covering_unit]["stamina"]
-		- units[covering_unit]["counter_stamina_cost"],
-		0
-	)
-
-	var defender_died = combat_logic.resolve_attack(
-		units[covering_unit],
-		units[moving_unit],
-		units[covering_unit]["counter_damage_multiplier"]
-	)
-
-	return defender_died
 
 # ==================================================
 # HOVER HELPERS

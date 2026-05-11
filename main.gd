@@ -892,7 +892,12 @@ func handle_facing_click(clicked_cell: Vector2i):
 	)
 
 	clear_selection()
-	auto_end_turn_if_needed()
+	turn_number = action_system.auto_end_turn_if_needed(
+		units,
+		turn_manager,
+		stamina_system,
+		turn_number
+	)
 
 	queue_redraw()
 
@@ -906,63 +911,43 @@ func handle_facing_click(clicked_cell: Vector2i):
 
 func confirm_attack():
 
-	if selected_unit == -1:
-		return
-
-	if pending_attack_target == -1:
-		return
-
-	var target_pos = units[pending_attack_target]["pos"]
-
-	var attack_direction = target_pos - pending_move_cell
-
-	attack_direction = Vector2i(
-		sign(attack_direction.x),
-		sign(attack_direction.y)
-	)
-
-	units[selected_unit]["facing"] = attack_direction
-	units[selected_unit]["has_acted"] = true
-
-	if coverage_system.resolve_pending_coverage_if_needed(
+	var result = action_system.confirm_attack(
 		units,
 		combat_logic,
+		coverage_system,
+		stamina_system,
 		selected_unit,
+		pending_attack_target,
+		pending_move_cell,
+		pending_move_distance,
 		pending_coverage_enemies
-	):
+	)
 
-		units.remove_at(selected_unit)
+	if result.is_empty():
+		return
+
+	awaiting_attack_confirmation = result["awaiting_attack_confirmation"]
+	pending_attack_target = result["pending_attack_target"]
+
+	if result["attacker_died"]:
+		units.remove_at(result["attacker_remove_index"])
 		clear_selection()
 		queue_redraw()
 		return
 
-	stamina_system.spend_movement_stamina(
-		units,
-		selected_unit,
-		pending_move_distance
-	)
-
-	var defender_died = combat_logic.resolve_attack(
-		units[selected_unit],
-		units[pending_attack_target]
-	)
-
-	stamina_system.spend_attack_stamina(
-		units,
-		selected_unit
-	)
-
-	if defender_died:
-		units.remove_at(pending_attack_target)
-
-	pending_attack_target = -1
-	awaiting_attack_confirmation = false
+	if result["defender_died"]:
+		units.remove_at(result["defender_remove_index"])
 
 	clear_selection()
-	auto_end_turn_if_needed()
+
+	turn_number = action_system.auto_end_turn_if_needed(
+		units,
+		turn_manager,
+		stamina_system,
+		turn_number
+	)
 
 	queue_redraw()
-
 
 # =========================
 # Confirms wait action.
@@ -975,36 +960,36 @@ func confirm_attack():
 
 func confirm_wait():
 
-	if selected_unit == -1:
-		return
-
-	if not has_pending_move():
-		return
-
-	units[selected_unit]["has_acted"] = true
-
-	if coverage_system.resolve_pending_coverage_if_needed(
+	var result = action_system.confirm_wait(
 		units,
 		combat_logic,
+		coverage_system,
+		stamina_system,
 		selected_unit,
+		pending_move_cell,
+		pending_move_distance,
 		pending_coverage_enemies
-	):
+	)
 
-		units.remove_at(selected_unit)
+	if result.is_empty():
+		return
+
+	awaiting_wait_confirmation = result["awaiting_wait_confirmation"]
+
+	if result["unit_died"]:
+		units.remove_at(result["remove_index"])
 		clear_selection()
 		queue_redraw()
 		return
 
-	stamina_system.spend_movement_stamina(
-		units,
-		selected_unit,
-		pending_move_distance
-	)
-
-	awaiting_wait_confirmation = false
-
 	clear_selection()
-	auto_end_turn_if_needed()
+
+	turn_number = action_system.auto_end_turn_if_needed(
+		units,
+		turn_manager,
+		stamina_system,
+		turn_number
+	)
 
 	queue_redraw()
 
@@ -1015,53 +1000,37 @@ func confirm_wait():
 
 func confirm_heal():
 
-	if selected_unit == -1:
-		return
-
-	if pending_heal_target == -1:
-		return
-
-	if units[selected_unit]["heal_charges"] <= 0:
-		return
-
-	var dead_index = selected_unit
-
-	if coverage_system.resolve_pending_coverage_if_needed(
+	var result = action_system.confirm_heal(
 		units,
 		combat_logic,
+		coverage_system,
+		stamina_system,
 		selected_unit,
+		pending_heal_target,
+		pending_move_distance,
 		pending_coverage_enemies
-	):
+	)
 
-		units.remove_at(dead_index)
+	if result.is_empty():
+		return
+
+	awaiting_heal_confirmation = result["awaiting_heal_confirmation"]
+	pending_heal_target = result["pending_heal_target"]
+
+	if result["unit_died"]:
+		units.remove_at(result["remove_index"])
 		clear_selection()
 		queue_redraw()
 		return
 
-	stamina_system.spend_movement_stamina(
-		units,
-		selected_unit,
-		pending_move_distance
-	)
-
-	combat_logic.apply_heal(
-		units[pending_heal_target],
-		15
-	)
-
-	units[selected_unit]["heal_charges"] -= 1
-	units[selected_unit]["stamina"] = max(
-		units[selected_unit]["stamina"]
-		- units[selected_unit]["heal_stamina_cost"],
-		0
-		)
-	units[selected_unit]["has_acted"] = true
-
-	pending_heal_target = -1
-	awaiting_heal_confirmation = false
-
 	clear_selection()
-	auto_end_turn_if_needed()
+
+	turn_number = action_system.auto_end_turn_if_needed(
+		units,
+		turn_manager,
+		stamina_system,
+		turn_number
+	)
 
 	queue_redraw()
 
@@ -1072,83 +1041,39 @@ func confirm_heal():
 
 func confirm_regen():
 
-	if selected_unit == -1:
-		return
-
-	if pending_heal_target == -1:
-		return
-
-	if units[selected_unit]["heal_charges"] <= 0:
-		return
-
-	var dead_index = selected_unit
-
-	if coverage_system.resolve_pending_coverage_if_needed(
+	var result = action_system.confirm_regen(
 		units,
 		combat_logic,
+		coverage_system,
+		stamina_system,
 		selected_unit,
+		pending_heal_target,
+		pending_move_distance,
 		pending_coverage_enemies
-	):
+	)
 
-		units.remove_at(dead_index)
+	if result.is_empty():
+		return
+
+	awaiting_heal_confirmation = result["awaiting_heal_confirmation"]
+	pending_heal_target = result["pending_heal_target"]
+
+	if result["unit_died"]:
+		units.remove_at(result["remove_index"])
 		clear_selection()
 		queue_redraw()
 		return
 
-	stamina_system.spend_movement_stamina(
-		units,
-		selected_unit,
-		pending_move_distance
-	)
-
-	combat_logic.apply_regen(
-		units[pending_heal_target],
-		5,
-		4
-	)
-
-	units[selected_unit]["heal_charges"] -= 1
-	units[selected_unit]["stamina"] = max(
-		units[selected_unit]["stamina"]
-		- units[selected_unit]["regen_stamina_cost"],
-		0
-		)
-	units[selected_unit]["has_acted"] = true
-
-	pending_heal_target = -1
-	awaiting_heal_confirmation = false
-
 	clear_selection()
-	auto_end_turn_if_needed()
+
+	turn_number = action_system.auto_end_turn_if_needed(
+		units,
+		turn_manager,
+		stamina_system,
+		turn_number
+	)
 
 	queue_redraw()
-
-
-# =========================
-# Automatically ends the current team's turn
-# if all units on that team have acted.
-# =========================
-
-func auto_end_turn_if_needed():
-
-	for unit in units:
-
-		if unit["team"] != turn_manager.current_team:
-			continue
-
-		if not unit["has_acted"]:
-			return
-
-	if turn_manager.current_team == "player":
-		stamina_system.recover_idle_player_healers(units)
-
-	turn_manager.end_turn(units)
-
-	if turn_manager.current_team == "player":
-		turn_number += 1
-
-	queue_redraw()
-	
 
 # ==================================================
 # ARCHER HELPERS

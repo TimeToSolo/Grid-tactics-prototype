@@ -60,3 +60,5 @@ script = ExtResource("14_w48qg")
 
 [node name="ActionSystem" type="Node" parent="." unique_id=514510247]
 script = ExtResource("15_vivmo")
+
+[node name="Node" type="Node" parent="." unique_id=1953195263]

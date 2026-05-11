@@ -30,6 +30,7 @@ extends Node2D
 @onready var coverage_system = $CoverageSystem
 @onready var hover_query = $HoverQuery
 @onready var map_data = $MapData
+@onready var render_system = $RenderSystem
 @onready var selection_state = $SelectionState
 @onready var stamina_system = $StaminaSystem
 @onready var turn_manager = $TurnManager
@@ -122,709 +123,146 @@ var turn_number = 1
 
 func _draw():
 
-	draw_grid()
-
-	draw_move_tiles()
-	draw_heal_range()
-	draw_attack_range()
-
-	draw_all_coverage()
-
-	draw_pending_move_tile()
-	draw_facing_choice_tiles()
-	draw_coverage_preview()
-
-	draw_units()
-
-	draw_attack_hover_preview()
-	draw_heal_hover_preview()
-
-	draw_turn_indicator()
-
-	draw_wait_confirmation_prompt()
-	draw_attack_confirmation_prompt()
-	draw_heal_confirmation_prompt()
-
-
-# ==================================================
-# GRID / TILE DRAWING
-# ==================================================
-
-# =========================
-# Draws the base terrain grid.
-# =========================
-
-func draw_grid():
-
-	for y in range(map_data.GRID_HEIGHT):
-		for x in range(map_data.GRID_WIDTH):
-
-			var cell = Vector2i(x, y)
-			var rect = map_data.grid_rect(cell)
-
-			draw_rect(
-				rect,
-				map_data.get_tile_color(cell),
-				true
-			)
-
-			draw_rect(
-				rect,
-				Color.WHITE,
-				false
-			)
-
-
-# =========================
-# Draws reachable movement tiles.
-#
-# Cyan:
-# - normal movement
-#
-# Darker blue:
-# - max-range movement
-# - limited pivot/facing
-# =========================
-
-func draw_move_tiles():
-
-	if selected_unit == -1:
-		return
-
-	var start = selected_unit_start_cell
-	var max_move = units[selected_unit]["move"]
-
-	for cell in move_tiles:
-
-		var rect = map_data.grid_rect(cell)
-
-		if map_data.is_max_range_tile(start, cell, max_move):
-
-			draw_rect(
-				rect,
-				Color(0.0, 0.65, 0.85, 0.60),
-				true
-			)
-
-		else:
-
-			draw_rect(
-				rect,
-				Color(0.0, 0.8, 1.0, 0.45),
-				true
-			)
-
-
-# =========================
-# Draws pending destination tile.
-# =========================
-
-func draw_pending_move_tile():
-
-	if not has_pending_move():
-		return
-
-	draw_rect(
-		map_data.grid_rect(pending_move_cell),
-		Color(1.0, 1.0, 0.0, 0.65),
-		true
-	)
-
-
-# ==================================================
-# ATTACK RANGE DRAWING
-# ==================================================
-
-# =========================
-# Draws attack preview overlays.
-#
-# Red tiles show valid attack range.
-# =========================
-
-func draw_attack_range():
-
-	if selected_unit == -1:
-		return
-
-	var unit = units[selected_unit]
-	var unit_class = unit["class"]
-
-	var attack_tiles: Array[Vector2i] = []
-
-	if has_pending_move():
-
-		if unit_class == "healer":
-			attack_tiles = unit_logic.get_adjacent_choice_tiles(
-				pending_move_cell,
-				map_data
-			)
-		else:
-			attack_tiles = unit_logic.get_attack_choice_tiles(
-				pending_move_cell,
-				unit_class,
-				map_data
-			)
-
-	else:
-
-		attack_tiles = unit_logic.get_attack_tiles_from_move_tiles(
-			move_tiles,
-			unit_class,
-			map_data
-		)
-
-	for tile in attack_tiles:
-
-		if not map_data.is_inside_grid(tile):
-			continue
-
-		var rect = map_data.grid_rect(tile)
-
-		var fill_color = Color(1.0, 0.15, 0.15, 0.18)
-		var border_color = Color(1.0, 0.1, 0.1, 0.9)
-
-		if unit_class == "healer":
-			draw_rect(rect, border_color, false, 3)
-		else:
-			draw_rect(rect, fill_color, true)
-			draw_rect(rect, border_color, false, 3)
-
-# =========================
-# Draws healer support range after moving.
-#
-# Blue tiles show valid heal/regeneration range.
-# =========================
-
-func draw_heal_range():
-
-	if selected_unit == -1:
-		return
-
-	if not has_pending_move():
-		return
-
-	if units[selected_unit]["class"] != "healer":
-		return
-
-	var heal_tiles = unit_logic.get_heal_choice_tiles(
-		pending_move_cell,
+	render_system.draw_grid(
+		self,
 		map_data
 	)
 
-	for tile in heal_tiles:
+	render_system.draw_move_tiles(
+		self,
+		map_data,
+		units,
+		selected_unit,
+		selected_unit_start_cell,
+		move_tiles
+	)
 
-		if not map_data.is_inside_grid(tile):
-			continue
-
-		var rect = map_data.grid_rect(tile)
-
-		draw_rect(
-			rect,
-			Color(0.2, 0.8, 1.0, 0.22),
-			true
-		)
-
-		draw_rect(
-			rect,
-			Color(0.2, 0.9, 1.0, 0.9),
-			false,
-			3
-		)
-
-
-# ==================================================
-# COVERAGE DRAWING
-# ==================================================
-
-# =========================
-# Draws all active coverage zones.
-#
-# coverage_mode:
-# 0 = off
-# 1 = player
-# 2 = enemy
-# 3 = all
-# =========================
-
-func draw_all_coverage():
-
-	if coverage_mode == 0:
-		return
-
-	for i in range(units.size()):
-
-		var unit = units[i]
-		var team = unit["team"]
-
-		if coverage_mode == 1 and team != "player":
-			continue
-
-		if coverage_mode == 2 and team != "enemy":
-			continue
-
-		if not coverage_system.has_active_coverage(
-			units,
-			i
-		):
-			continue
-
-		var pos = unit["pos"]
-		var facing = unit["facing"]
-		var unit_class = unit["class"]
-
-		if facing == Vector2i.ZERO:
-			continue
-
-		var coverage_color = Color(1.0, 0.85, 0.0, 0.35)
-
-		if team == "enemy":
-			coverage_color = Color(1.0, 0.1, 0.1, 0.35)
-
-		var covered_tiles = unit_logic.get_coverage_tiles(
-			unit_class,
-			pos,
-			facing
-		)
-
-		# Tank slow/control zones.
-		if unit_class == "tank":
-
-			var slow_tiles = unit_logic.get_tank_slow_tiles(
-				pos,
-				facing
-			)
-
-			for tile in slow_tiles:
-
-				if not map_data.is_inside_grid(tile):
-					continue
-
-				var slow_color = Color(0.75, 0.6, 0.1, 0.30)
-
-				if team == "enemy":
-					slow_color = Color(0.65, 0.45, 0.0, 0.30)
-
-				draw_rect(
-					map_data.grid_rect(tile),
-					slow_color,
-					true
-				)
-
-		for tile in covered_tiles:
-
-			if not map_data.is_inside_grid(tile):
-				continue
-
-			draw_rect(
-				map_data.grid_rect(tile),
-				coverage_color,
-				true
-			)
-
-
-# =========================
-# Draws green preview coverage while hovering
-# a valid facing-selection tile.
-# =========================
-
-func draw_coverage_preview():
-
-	if selected_unit == -1:
-		return
-
-	if not has_pending_move():
-		return
-
-	if hover_query.is_hovering_attackable_enemy(
+	render_system.draw_heal_range(
+		self,
+		map_data,
+		unit_logic,
 		units,
 		selected_unit,
 		pending_move_cell,
-		hovered_cell,
-		has_pending_move(),
-		unit_logic,
-		unit_query,
-		map_data
-	):
-		return
-
-	var unit_class = units[selected_unit]["class"]
-	var facing: Vector2i = Vector2i.ZERO
-
-	if unit_class == "lancer":
-
-		var lancer_tiles = get_valid_lancer_facing_tiles()
-
-		if not lancer_tiles.has(hovered_cell):
-			return
-
-		facing = action_query.get_lancer_facing_from_target(
-			pending_move_cell,
-			hovered_cell
-		)
-
-	else:
-
-		var facing_tiles = unit_logic.get_facing_choice_tiles(
-			pending_move_cell,
-			pending_move_distance,
-			pending_move_direction,
-			units[selected_unit]["move"],
-			map_data
-		)
-
-		if not facing_tiles.has(hovered_cell):
-			return
-
-		facing = hovered_cell - pending_move_cell
-
-	var coverage_tiles = unit_logic.get_coverage_tiles(
-		unit_class,
-		pending_move_cell,
-		facing
+		has_pending_move()
 	)
 
-	if unit_class == "tank":
+	render_system.draw_attack_range(
+		self,
+		map_data,
+		unit_logic,
+		units,
+		selected_unit,
+		move_tiles,
+		pending_move_cell,
+		has_pending_move()
+	)
 
-		var slow_tiles = unit_logic.get_tank_slow_tiles(
-			pending_move_cell,
-			facing
-		)
+	render_system.draw_all_coverage(
+		self,
+		map_data,
+		unit_logic,
+		coverage_system,
+		units,
+		coverage_mode
+	)
 
-		for cell in slow_tiles:
+	render_system.draw_pending_move_tile(
+		self,
+		map_data,
+		pending_move_cell,
+		has_pending_move()
+	)
 
-			if map_data.is_inside_grid(cell):
-
-				draw_rect(
-					map_data.grid_rect(cell),
-					Color(0.75, 0.6, 0.1, 0.45),
-					true
-				)
-
-	for cell in coverage_tiles:
-
-		if map_data.is_inside_grid(cell):
-
-			draw_rect(
-				map_data.grid_rect(cell),
-				Color(0.0, 1.0, 0.0, 0.55),
-				true
-			)
-
-
-# ==================================================
-# FACING DRAWING
-# ==================================================
-
-# =========================
-# Draws purple facing-selection tiles.
-# =========================
-
-func draw_facing_choice_tiles():
-
-	if selected_unit == -1:
-		return
-
-	if not has_pending_move():
-		return
-
-	if move_tiles.size() > 0:
-		return
-
-	if (
-		units[selected_unit]["class"] == "archer"
-		or units[selected_unit]["class"] == "healer"
-	):
-		return
-		
-	if units[selected_unit]["class"] == "lancer":
-
-		for cell in get_valid_lancer_facing_tiles():
-			draw_rect(
-				map_data.grid_rect(cell),
-				Color(0.7, 0.2, 1.0, 0.55),
-				true
-			)
-
-		return
-
-	var facing_tiles = unit_logic.get_facing_choice_tiles(
+	render_system.draw_facing_choice_tiles(
+		self,
+		map_data,
+		unit_logic,
+		units,
+		selected_unit,
+		move_tiles,
 		pending_move_cell,
 		pending_move_distance,
 		pending_move_direction,
-		units[selected_unit]["move"],
-		map_data
+		has_pending_move(),
+		get_valid_lancer_facing_tiles()
 	)
 
-	for cell in facing_tiles:
-		draw_rect(
-			map_data.grid_rect(cell),
-			Color(0.7, 0.2, 1.0, 0.55),
-			true
-		)
-
-
-# ==================================================
-# UNIT DRAWING
-# ==================================================
-
-# =========================
-# Draws units, outlines, HP, stamina,
-# healer charges, and facing indicators.
-# =========================
-
-func draw_units():
-
-	for i in range(units.size()):
-
-		var unit = units[i]
-
-		var pos = unit["pos"]
-		var unit_rect = map_data.grid_rect(pos)
-
-		var unit_color = unit_logic.get_unit_color(
-			unit["class"]
-		)
-
-		if unit["has_acted"]:
-			unit_color = unit_color.darkened(0.45)
-
-		draw_rect(unit_rect, unit_color, true)
-
-		var outline_color = Color(0.2, 0.5, 1.0)
-
-		if unit["team"] == "enemy":
-			outline_color = Color(1.0, 0.2, 0.2)
-
-		if i == selected_unit:
-			outline_color = Color(1.0, 0.8, 0.2)
-
-		draw_rect(unit_rect, outline_color, false, 3)
-
-		# HP
-		draw_string(
-			ThemeDB.fallback_font,
-			unit_rect.position + Vector2(8, 22),
-			str(unit["hp"]),
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			16,
-			Color.BLACK
-		)
-
-		# Stamina
-		draw_string(
-			ThemeDB.fallback_font,
-			unit_rect.position + Vector2(40, 16),
-			str(stamina_system.get_display_stamina(
-				units,
-				i,
-				selected_unit,
-				has_pending_move(),
-				pending_move_distance
-			)),
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			12,
-			Color.BLACK
-		)
-
-		# Healer charges
-		if unit["class"] == "healer":
-
-			var charge_text = (
-				str(unit["heal_charges"])
-				+ "/"
-				+ str(unit["max_heal_charges"])
-			)
-
-			draw_string(
-				ThemeDB.fallback_font,
-				unit_rect.position + Vector2(28, 52),
-				charge_text,
-				HORIZONTAL_ALIGNMENT_LEFT,
-				-1,
-				12,
-				Color.BLACK
-			)
-
-		if unit["class"] != "healer" and unit["class"] != "archer":
-			draw_unit_facing(
-				pos,
-				unit["facing"]
-			)
-
-
-# =========================
-# Draws facing direction indicator.
-# =========================
-
-func draw_unit_facing(
-	pos: Vector2i,
-	facing: Vector2i
-):
-
-	if facing == Vector2i.ZERO:
-		return
-
-	var rect = map_data.grid_rect(pos)
-
-	var center = rect.position + rect.size / 2
-
-	var end = center + (
-		Vector2(facing.x, facing.y).normalized() * 24
+	render_system.draw_coverage_preview(
+		self,
+		map_data,
+		unit_logic,
+		unit_query,
+		hover_query,
+		action_query,
+		units,
+		selected_unit,
+		pending_move_cell,
+		pending_move_distance,
+		pending_move_direction,
+		hovered_cell,
+		has_pending_move(),
+		get_valid_lancer_facing_tiles()
 	)
 
-	draw_line(
-		center,
-		end,
-		Color.BLACK,
-		4
+	render_system.draw_units(
+		self,
+		map_data,
+		unit_logic,
+		stamina_system,
+		units,
+		selected_unit,
+		pending_move_distance,
+		has_pending_move()
 	)
 
-
-# ==================================================
-# UI PROMPTS / HOVER PREVIEW
-# ==================================================
-
-func draw_turn_indicator():
-
-	var turn_color = Color(0.2, 0.5, 1.0)
-
-	if turn_manager.current_team == "enemy":
-		turn_color = Color(1.0, 0.2, 0.2)
-
-	var text = (
-		"Turn "
-		+ str(turn_number)
-		+ " - "
-		+ turn_manager.current_team.capitalize()
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(16, 30),
-		text,
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		20,
-		turn_color
-	)
-
-
-func draw_wait_confirmation_prompt():
-
-	if not awaiting_wait_confirmation:
-		return
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(260, 30),
-		"Wait? W / Cancel: N",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		20,
-		Color.WHITE
-	)
-
-
-func draw_attack_confirmation_prompt():
-
-	if not awaiting_attack_confirmation:
-		return
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(260, 30),
-		"Attack? Y/N",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		20,
-		Color.WHITE
-	)
-
-
-func draw_heal_confirmation_prompt():
-
-	if not awaiting_heal_confirmation:
-		return
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(260, 30),
-		"Heal: H / Regen: R / Cancel: N",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		20,
-		Color.WHITE
-	)
-
-
-func draw_attack_hover_preview():
-
-	if not hover_query.is_hovering_attackable_enemy(
+	render_system.draw_attack_hover_preview(
+		self,
+		map_data,
+		unit_logic,
+		unit_query,
+		hover_query,
 		units,
 		selected_unit,
 		pending_move_cell,
 		hovered_cell,
-		has_pending_move(),
+		has_pending_move()
+	)
+
+	render_system.draw_heal_hover_preview(
+		self,
+		map_data,
 		unit_logic,
 		unit_query,
-		map_data
-	):
-		return
-
-	var rect = map_data.grid_rect(hovered_cell)
-
-	draw_rect(
-		rect,
-		Color(1.0, 0.0, 0.0, 0.45),
-		true
-	)
-
-	draw_rect(
-		rect,
-		Color.WHITE,
-		false,
-		4
-	)
-
-# =========================
-# Draws hover preview for valid
-# healer support targets.
-#
-# Highlights healable allies currently
-# inside healer support range.
-# =========================
-
-func draw_heal_hover_preview():
-
-	if not hover_query.is_hovering_healable_ally(
+		hover_query,
 		units,
 		selected_unit,
 		pending_move_cell,
 		hovered_cell,
-		has_pending_move(),
-		unit_logic,
-		unit_query,
-		map_data
-	):
-		return
-
-	var rect = map_data.grid_rect(hovered_cell)
-
-	draw_rect(
-		rect,
-		Color(0.2, 0.6, 1.0, 0.45),
-		true
+		has_pending_move()
 	)
 
-	draw_rect(
-		rect,
-		Color.WHITE,
-		false,
-		4
+	render_system.draw_turn_indicator(
+		self,
+		turn_manager,
+		turn_number
 	)
-	
+
+	render_system.draw_wait_confirmation_prompt(
+		self,
+		awaiting_wait_confirmation
+	)
+
+	render_system.draw_attack_confirmation_prompt(
+		self,
+		awaiting_attack_confirmation
+	)
+
+	render_system.draw_heal_confirmation_prompt(
+		self,
+		awaiting_heal_confirmation
+	)
+
 # ==================================================
 # ENGINE CALLBACKS
 # ==================================================

@@ -804,3 +804,75 @@ func draw_heal_hover_preview(
 		false,
 		4
 	)
+
+# =========================
+# Draws hovered movement path preview.
+#
+# Yellow:
+# - normal path
+#
+# Red:
+# - tile where coverage counter triggers
+# =========================
+
+func draw_path_preview(
+	canvas: CanvasItem,
+	map_data,
+	units: Array,
+	path_preview: Dictionary
+):
+
+	if path_preview.is_empty():
+		return
+
+	var path_cells: Array[Vector2i] = path_preview["path_cells"]
+	var danger_cells: Array[Vector2i] = path_preview["danger_cells"]
+	var countering_units: Array[int] = path_preview["countering_units"]
+
+	for cell in path_cells:
+
+		var rect = map_data.grid_rect(cell)
+
+		if danger_cells.has(cell):
+
+			canvas.draw_rect(
+				rect,
+				Color(1.0, 0.0, 0.0, 0.55),
+				true
+			)
+
+			canvas.draw_rect(
+				rect,
+				Color.WHITE,
+				false,
+				4
+			)
+
+		else:
+
+			canvas.draw_rect(
+				rect,
+				Color(1.0, 1.0, 0.0, 0.35),
+				true
+			)
+
+	for unit_index in countering_units:
+
+		if unit_index < 0 or unit_index >= units.size():
+			continue
+
+		var unit_cell = units[unit_index]["pos"]
+		var rect = map_data.grid_rect(unit_cell)
+
+		canvas.draw_rect(
+			rect,
+			Color(1.0, 0.0, 0.0, 0.25),
+			true
+		)
+
+		canvas.draw_rect(
+			rect,
+			Color(1.0, 0.0, 0.0, 1.0),
+			false,
+			5
+		)

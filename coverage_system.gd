@@ -77,6 +77,55 @@ func get_enemies_entered_coverage(
 
 	return covering_enemies
 
+# =========================
+# Returns all enemies whose coverage
+# the moving unit ENTERED anywhere
+# along the actual movement path.
+#
+# This checks each step of the path,
+# instead of only start -> destination.
+# =========================
+
+func get_enemies_entered_coverage_along_path(
+	units: Array,
+	unit_logic,
+	unit_index: int,
+	path_cells: Array[Vector2i]
+) -> Array[int]:
+
+	var covering_enemies: Array[int] = []
+
+	if path_cells.size() <= 1:
+		return covering_enemies
+
+	var moving_team = units[unit_index]["team"]
+	var start_cell = path_cells[0]
+
+	for i in range(units.size()):
+
+		if units[i]["team"] == moving_team:
+			continue
+
+		if not has_active_coverage(units, i):
+			continue
+
+		var covered_tiles = unit_logic.get_coverage_tiles(
+			units[i]["class"],
+			units[i]["pos"],
+			units[i]["facing"]
+		)
+
+		var started_in_coverage = covered_tiles.has(start_cell)
+
+		for path_index in range(1, path_cells.size()):
+
+			var path_cell = path_cells[path_index]
+
+			if covered_tiles.has(path_cell) and not started_in_coverage:
+				covering_enemies.append(i)
+				break
+
+	return covering_enemies
 
 # =========================
 # Resolves delayed coverage damage.

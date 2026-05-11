@@ -332,6 +332,7 @@ func get_move_range(
 # Returns:
 # - cost: actual movement cost spent
 # - final_direction: direction of last step
+# - path_cells: ordered path from start to target
 # =========================
 
 func get_movement_path_data(
@@ -343,15 +344,15 @@ func get_movement_path_data(
 
 	var frontier = [{
 		"cell": start,
-		"cost": 0,
-		"previous": start
+		"cost": 0
 	}]
 
-	var visited = {
-		start: {
-			"cost": 0,
-			"previous": start
-		}
+	var came_from = {
+		start: start
+	}
+
+	var cost_so_far = {
+		start: 0
 	}
 
 	var dirs = [
@@ -364,21 +365,37 @@ func get_movement_path_data(
 	while frontier.size() > 0:
 
 		var current = frontier.pop_front()
+		var current_cell = current["cell"]
 
-		if current["cell"] == target:
+		if current_cell == target:
 
-			var previous_cell = current["previous"]
-			var final_direction = current["cell"] - previous_cell
+			var path_cells: Array[Vector2i] = []
+			var step = target
+
+			while step != start:
+				path_cells.push_front(step)
+				step = came_from[step]
+
+			path_cells.push_front(start)
+
+			var final_direction = Vector2i.ZERO
+
+			if path_cells.size() >= 2:
+				final_direction = (
+					path_cells[path_cells.size() - 1]
+					- path_cells[path_cells.size() - 2]
+				)
 
 			return {
-				"cost": current["cost"],
-				"final_direction": final_direction
+				"cost": cost_so_far[target],
+				"final_direction": final_direction,
+				"path_cells": path_cells
 			}
 
 		for dir in dirs:
 
-			var next = current["cell"] + dir
-			var next_cost = current["cost"] + 1
+			var next = current_cell + dir
+			var next_cost = cost_so_far[current_cell] + 1
 
 			if not is_inside_grid(next):
 				continue
@@ -389,21 +406,18 @@ func get_movement_path_data(
 			if occupied_tiles.has(next):
 				continue
 
-			if visited.has(next):
+			if cost_so_far.has(next):
 				continue
 
 			if next_cost > move_points:
 				continue
 
-			visited[next] = {
-				"cost": next_cost,
-				"previous": current["cell"]
-			}
+			cost_so_far[next] = next_cost
+			came_from[next] = current_cell
 
 			frontier.append({
 				"cell": next,
-				"cost": next_cost,
-				"previous": current["cell"]
+				"cost": next_cost
 			})
 
 	return {}

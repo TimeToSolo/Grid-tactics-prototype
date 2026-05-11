@@ -165,7 +165,8 @@ func handle_move_tile_click(
 	selected_unit: int,
 	selected_unit_start_cell: Vector2i,
 	clicked_cell: Vector2i,
-	move_tiles: Array[Vector2i]
+	move_tiles: Array[Vector2i],
+	path_cells: Array[Vector2i]
 ) -> Dictionary:
 
 	if selected_unit == -1:
@@ -182,18 +183,6 @@ func handle_move_tile_click(
 
 	var start = selected_unit_start_cell
 
-	var pending_move_cell = clicked_cell
-
-	var pending_coverage_enemies = coverage_system.get_enemies_entered_coverage(
-		units,
-		unit_logic,
-		selected_unit,
-		selected_unit_start_cell,
-		clicked_cell
-	)
-
-	units[selected_unit]["pos"] = pending_move_cell
-
 	var path_data = map_data.get_movement_path_data(
 		start,
 		clicked_cell,
@@ -207,8 +196,23 @@ func handle_move_tile_click(
 	if path_data.is_empty():
 		return {}
 
+	var pending_move_cell = clicked_cell
 	var pending_move_distance = path_data["cost"]
 	var pending_move_direction = path_data["final_direction"]
+
+	var movement_path: Array[Vector2i] = path_cells.duplicate()
+
+	if movement_path.is_empty():
+		movement_path = [selected_unit_start_cell, clicked_cell]
+
+	var pending_coverage_enemies = coverage_system.get_enemies_entered_coverage_along_path(
+		units,
+		unit_logic,
+		selected_unit,
+		movement_path
+	)
+
+	units[selected_unit]["pos"] = pending_move_cell
 
 	move_tiles.clear()
 

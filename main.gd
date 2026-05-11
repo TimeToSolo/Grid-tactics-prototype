@@ -32,6 +32,7 @@ extends Node2D
 @onready var hover_query = $HoverQuery
 @onready var map_data = $MapData
 @onready var movement_system = $MovementSystem
+@onready var path_preview_system = $PathPreviewSystem
 @onready var render_system = $RenderSystem
 @onready var selection_state = $SelectionState
 @onready var selection_system = $SelectionSystem
@@ -81,6 +82,9 @@ var selected_unit_start_cell: Vector2i = Vector2i(-1, -1)
 
 # Mouse hover tracking for previews.
 var hovered_cell: Vector2i = Vector2i(-1, -1)
+
+# Current cursor-traced movement preview path.
+var hover_path_cells: Array[Vector2i] = []
 
 
 # ==================================================
@@ -138,6 +142,19 @@ func _draw():
 		selected_unit,
 		selected_unit_start_cell,
 		move_tiles
+	)
+	
+	render_system.draw_path_preview(
+		self,
+		map_data,
+		units,
+		path_preview_system.get_path_preview_from_path(
+			units,
+			coverage_system,
+			unit_logic,
+			selected_unit,
+			hover_path_cells
+		)
 	)
 
 	render_system.draw_heal_range(
@@ -289,6 +306,17 @@ func _process(_delta):
 	var mouse_pos = get_viewport().get_mouse_position()
 
 	hovered_cell = map_data.world_to_grid(mouse_pos)
+
+	hover_path_cells = path_preview_system.update_hover_path(
+		hover_path_cells,
+		map_data,
+		units,
+		unit_query,
+		selected_unit,
+		selected_unit_start_cell,
+		hovered_cell,
+		move_tiles
+	)
 
 	queue_redraw()
 
@@ -656,6 +684,8 @@ func clear_selection():
 	pending_move_direction = state["pending_move_direction"]
 	pending_coverage_enemies = state["pending_coverage_enemies"]
 
+	hover_path_cells.clear()
+
 # =========================
 # Clears pending action confirmation state.
 #
@@ -686,6 +716,8 @@ func clear_pending_action_state():
 
 	pending_attack_target = state["pending_attack_target"]
 	pending_heal_target = state["pending_heal_target"]
+
+	hover_path_cells.clear()
 
 # ==================================================
 # SELECTION / MOVEMENT FLOW
@@ -785,7 +817,8 @@ func handle_move_tile_click(clicked_cell: Vector2i):
 		selected_unit,
 		selected_unit_start_cell,
 		clicked_cell,
-		move_tiles
+		move_tiles,
+		hover_path_cells
 	)
 
 	if result.is_empty():

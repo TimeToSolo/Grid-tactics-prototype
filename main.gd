@@ -34,6 +34,7 @@ extends Node2D
 @onready var movement_system = $MovementSystem
 @onready var render_system = $RenderSystem
 @onready var selection_state = $SelectionState
+@onready var selection_system = $SelectionSystem
 @onready var stamina_system = $StaminaSystem
 @onready var turn_manager = $TurnManager
 @onready var unit_data = $UnitData
@@ -704,27 +705,24 @@ func used_max_movement() -> bool:
 
 func handle_unit_click(clicked_cell: Vector2i):
 
-	var clicked_unit = unit_query.get_unit_at(
+	var result = selection_system.handle_unit_click(
 		units,
+		unit_query,
+		turn_manager,
+		selected_unit,
 		clicked_cell
 	)
 
-	if clicked_unit == -1:
+	if result.is_empty():
+		return
+
+	if result["clear_selection"]:
 		clear_selection()
+		queue_redraw()
 		return
 
-	if units[clicked_unit]["team"] != turn_manager.current_team:
-		return
-
-	if units[clicked_unit]["has_acted"]:
-		return
-
-	if selected_unit == clicked_unit:
-		clear_selection()
-		return
-
-	select_unit(clicked_unit)
-
+	if result["select_unit"]:
+		select_unit(result["selected_unit_index"])
 
 # =========================
 # Selects a unit and calculates movement tiles.
@@ -732,31 +730,29 @@ func handle_unit_click(clicked_cell: Vector2i):
 
 func select_unit(unit_index: int):
 
-	selected_unit = unit_index
-	selected_unit_start_cell = units[selected_unit]["pos"]
-
-	# Clear pending movement/action state.
-	pending_move_cell = Vector2i(-1, -1)
-	pending_facing = Vector2i.ZERO
-	pending_move_distance = 0
-	pending_move_direction = Vector2i.ZERO
-	pending_coverage_enemies.clear()
-
-	pending_attack_target = -1
-	pending_heal_target = -1
-
-	awaiting_attack_confirmation = false
-	awaiting_heal_confirmation = false
-	awaiting_wait_confirmation = false
-
-	move_tiles = map_data.get_move_range(
-		units[selected_unit]["pos"],
-		units[selected_unit]["move"],
-		unit_query.get_enemy_occupied_tiles(
+	var state = selection_system.select_unit(
 		units,
-		selected_unit
-		)
+		map_data,
+		unit_query,
+		unit_index
 	)
+
+	selected_unit = state["selected_unit"]
+	selected_unit_start_cell = state["selected_unit_start_cell"]
+	move_tiles = state["move_tiles"]
+
+	pending_move_cell = state["pending_move_cell"]
+	pending_facing = state["pending_facing"]
+	pending_move_distance = state["pending_move_distance"]
+	pending_move_direction = state["pending_move_direction"]
+	pending_coverage_enemies = state["pending_coverage_enemies"]
+
+	pending_attack_target = state["pending_attack_target"]
+	pending_heal_target = state["pending_heal_target"]
+
+	awaiting_attack_confirmation = state["awaiting_attack_confirmation"]
+	awaiting_heal_confirmation = state["awaiting_heal_confirmation"]
+	awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
 
 	queue_redraw()
 

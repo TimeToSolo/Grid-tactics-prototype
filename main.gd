@@ -27,6 +27,7 @@ extends Node2D
 @onready var battle_setup = $BattleSetup
 @onready var combat_logic = $CombatLogic
 @onready var map_data = $MapData
+@onready var stamina_system = $StaminaSystem
 @onready var turn_manager = $TurnManager
 @onready var unit_data = $UnitData
 @onready var unit_logic = $UnitLogic
@@ -598,7 +599,13 @@ func draw_units():
 		draw_string(
 			ThemeDB.fallback_font,
 			unit_rect.position + Vector2(40, 16),
-			str(get_display_stamina(i)),
+			str(stamina_system.get_display_stamina(
+				units,
+				i,
+				selected_unit,
+				has_pending_move(),
+				pending_move_distance
+			)),
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
 			12,
@@ -890,7 +897,7 @@ func cycle_coverage_mode():
 func end_player_turn():
 
 	if turn_manager.current_team == "player":
-		recover_idle_player_healers()
+		stamina_system.recover_idle_player_healers(units)
 
 	turn_manager.end_turn(units)
 
@@ -1420,7 +1427,11 @@ func handle_facing_click(clicked_cell: Vector2i):
 		queue_redraw()
 		return
 
-	spend_movement_stamina(selected_unit)
+	stamina_system.spend_movement_stamina(
+		units,
+		selected_unit,
+		pending_move_distance
+	)
 
 	clear_selection()
 	auto_end_turn_if_needed()
@@ -1624,14 +1635,21 @@ func confirm_attack():
 		queue_redraw()
 		return
 
-	spend_movement_stamina(selected_unit)
+	stamina_system.spend_movement_stamina(
+		units,
+		selected_unit,
+		pending_move_distance
+	)
 
 	var defender_died = combat_logic.resolve_attack(
 		units[selected_unit],
 		units[pending_attack_target]
 	)
 
-	spend_attack_stamina(selected_unit)
+	stamina_system.spend_attack_stamina(
+		units,
+		selected_unit
+	)
 
 	if defender_died:
 		units.remove_at(pending_attack_target)
@@ -1671,7 +1689,11 @@ func confirm_wait():
 		queue_redraw()
 		return
 
-	spend_movement_stamina(selected_unit)
+	stamina_system.spend_movement_stamina(
+		units,
+		selected_unit,
+		pending_move_distance
+	)
 
 	awaiting_wait_confirmation = false
 
@@ -1705,7 +1727,11 @@ func confirm_heal():
 		queue_redraw()
 		return
 
-	spend_movement_stamina(selected_unit)
+	stamina_system.spend_movement_stamina(
+		units,
+		selected_unit,
+		pending_move_distance
+	)
 
 	combat_logic.apply_heal(
 		units[pending_heal_target],
@@ -1753,7 +1779,11 @@ func confirm_regen():
 		queue_redraw()
 		return
 
-	spend_movement_stamina(selected_unit)
+	stamina_system.spend_movement_stamina(
+		units,
+		selected_unit,
+		pending_move_distance
+	)
 
 	combat_logic.apply_regen(
 		units[pending_heal_target],
@@ -1794,7 +1824,7 @@ func auto_end_turn_if_needed():
 			return
 
 	if turn_manager.current_team == "player":
-		recover_idle_player_healers()
+		stamina_system.recover_idle_player_healers(units)
 
 	turn_manager.end_turn(units)
 
@@ -1925,121 +1955,6 @@ func resolve_coverage_reaction(
 	)
 
 	return defender_died
-
-
-# ==================================================
-# STAMINA SYSTEM
-# ==================================================
-
-# =========================
-# Spends stamina based on movement distance.
-#
-# Moving farther reduces remaining
-# defensive reaction potential.
-# =========================
-
-func spend_movement_stamina(unit_index: int):
-
-	if unit_index == -1:
-		return
-
-	var movement_cost = (
-		pending_move_distance
-		* units[unit_index]["move_stamina_cost"]
-	)
-
-	units[unit_index]["stamina"] = max(
-		units[unit_index]["stamina"] - movement_cost,
-		0
-	)
-
-# =========================
-# Spends stamina when a unit attacks.
-#
-# Archer special rule:
-# - firing consumes all remaining stamina
-#
-# Other classes:
-# - spend their attack stamina cost
-# =========================
-
-func spend_attack_stamina(unit_index: int):
-
-	if unit_index == -1:
-		return
-
-	if units[unit_index]["class"] == "archer":
-		units[unit_index]["stamina"] = 0
-		return
-
-	units[unit_index]["stamina"] = max(
-		units[unit_index]["stamina"] - units[unit_index]["attack_stamina_cost"],
-		0
-	)
-
-# =========================
-# Returns displayed stamina for a unit.
-#
-# Pending movement does not actually spend
-# stamina until the action is confirmed,
-# but the UI should preview expected stamina.
-# =========================
-
-func get_display_stamina(unit_index: int) -> int:
-
-	if unit_index != selected_unit:
-		return units[unit_index]["stamina"]
-
-	if not has_pending_move():
-		return units[unit_index]["stamina"]
-
-	var movement_cost = (
-		pending_move_distance
-		* units[unit_index]["move_stamina_cost"]
-	)
-
-	return max(
-		units[unit_index]["stamina"] - movement_cost,
-		0
-	)
-
-# =========================
-# Recovers healer charges based on
-# remaining stamina at turn end.
-#
-# 90+ stamina = +2 charges
-# 50+ stamina = +1 charge
-# Below 50 = no recovery
-# =========================
-
-func recover_idle_player_healers():
-
-	for unit in units:
-
-		if unit["team"] != "player":
-			continue
-
-		if unit["class"] != "healer":
-			continue
-
-		var recovery_amount = 0
-
-		if (
-			unit["stamina"]
-			>= unit["charge_recovery_threshold_2"]
-		):
-			recovery_amount = 2
-
-		elif (
-			unit["stamina"]
-			>= unit["charge_recovery_threshold_1"]
-		):
-			recovery_amount = 1
-
-		unit["heal_charges"] = min(
-			unit["heal_charges"] + recovery_amount,
-			unit["max_heal_charges"]
-		)
 
 # ==================================================
 # HOVER HELPERS

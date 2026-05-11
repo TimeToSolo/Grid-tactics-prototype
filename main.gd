@@ -24,11 +24,13 @@ extends Node2D
 # NODE REFERENCES
 # ==================================================
 
-@onready var map_data = $MapData
-@onready var unit_logic = $UnitLogic
+@onready var battle_setup = $BattleSetup
 @onready var combat_logic = $CombatLogic
+@onready var map_data = $MapData
 @onready var turn_manager = $TurnManager
 @onready var unit_data = $UnitData
+@onready var unit_logic = $UnitLogic
+@onready var unit_query = $UnitQuery
 
 # ==================================================
 # CONSTANTS
@@ -792,42 +794,9 @@ func draw_heal_hover_preview():
 
 func _ready():
 
-	units = [
-		# Player units - top-left 2x3 block
-		unit_data.create_unit("fighter", "player", Vector2i(1, 2), Vector2i(0, 1)),
-		unit_data.create_unit("tank", "player", Vector2i(2, 2), Vector2i(0, 1)),
-		unit_data.create_unit("lancer", "player", Vector2i(3, 2), Vector2i(0, 1)),
-		unit_data.create_unit("duelist", "player", Vector2i(1, 3), Vector2i(0, 1)),
-		unit_data.create_unit("healer", "player", Vector2i(2, 3), Vector2i(0, 1)),
-		unit_data.create_unit("archer", "player", Vector2i(3, 3), Vector2i(0, 1)),
-
-		# Player units - bottom-left 2x3 block
-		unit_data.create_unit("fighter", "player", Vector2i(1, 8), Vector2i(0, -1)),
-		unit_data.create_unit("tank", "player", Vector2i(2, 8), Vector2i(0, -1)),
-		unit_data.create_unit("lancer", "player", Vector2i(3, 8), Vector2i(0, -1)),
-		unit_data.create_unit("duelist", "player", Vector2i(1, 9), Vector2i(0, -1)),
-		unit_data.create_unit("healer", "player", Vector2i(2, 9), Vector2i(0, -1)),
-		unit_data.create_unit("archer", "player", Vector2i(3, 9), Vector2i(0, -1)),
-
-		# Enemy units - top-right 2x3 block
-		unit_data.create_unit("fighter", "enemy", Vector2i(12, 2), Vector2i(0, 1)),
-		unit_data.create_unit("tank", "enemy", Vector2i(13, 2), Vector2i(0, 1)),
-		unit_data.create_unit("lancer", "enemy", Vector2i(14, 2), Vector2i(0, 1)),
-		unit_data.create_unit("duelist", "enemy", Vector2i(12, 3), Vector2i(0, 1)),
-		unit_data.create_unit("healer", "enemy", Vector2i(13, 3), Vector2i(0, 1)),
-		unit_data.create_unit("archer", "enemy", Vector2i(14, 3), Vector2i(0, 1)),
-
-		# Enemy units - bottom-right 2x3 block
-		unit_data.create_unit("fighter", "enemy", Vector2i(12, 8), Vector2i(0, -1)),
-		unit_data.create_unit("tank", "enemy", Vector2i(13, 8), Vector2i(0, -1)),
-		unit_data.create_unit("lancer", "enemy", Vector2i(14, 8), Vector2i(0, -1)),
-		unit_data.create_unit("duelist", "enemy", Vector2i(12, 9), Vector2i(0, -1)),
-		unit_data.create_unit("healer", "enemy", Vector2i(13, 9), Vector2i(0, -1)),
-		unit_data.create_unit("archer", "enemy", Vector2i(14, 9), Vector2i(0, -1))
-	]
+	units = battle_setup.create_battle_units(unit_data)
 
 	queue_redraw()
-
 
 # =========================
 # Per-frame updates.
@@ -1170,7 +1139,10 @@ func is_clicking_empty_action_tile(clicked_cell: Vector2i) -> bool:
 	if not has_pending_move():
 		return false
 
-	if get_unit_at(clicked_cell) != -1:
+	if unit_query.get_unit_at(
+		units,
+		clicked_cell
+		) != -1:
 		return false
 
 	var unit_class = units[selected_unit]["class"]
@@ -1293,7 +1265,10 @@ func should_handle_move_click(
 
 func handle_unit_click(clicked_cell: Vector2i):
 
-	var clicked_unit = get_unit_at(clicked_cell)
+	var clicked_unit = unit_query.get_unit_at(
+		units,
+		clicked_cell
+	)
 
 	if clicked_unit == -1:
 		clear_selection()
@@ -1338,7 +1313,10 @@ func select_unit(unit_index: int):
 	move_tiles = map_data.get_move_range(
 		units[selected_unit]["pos"],
 		units[selected_unit]["move"],
-		get_enemy_occupied_tiles(selected_unit)
+		unit_query.get_enemy_occupied_tiles(
+		units,
+		selected_unit
+		)
 	)
 
 	queue_redraw()
@@ -1357,7 +1335,10 @@ func handle_move_tile_click(clicked_cell: Vector2i):
 	if selected_unit == -1:
 		return
 
-	if is_tile_occupied(clicked_cell) and clicked_cell != units[selected_unit]["pos"]:
+	if unit_query.is_tile_occupied(
+		units,
+		clicked_cell
+	) and clicked_cell != units[selected_unit]["pos"]:
 		return
 
 	var start = selected_unit_start_cell
@@ -1576,9 +1557,16 @@ func start_heal_confirmation(target_unit: int):
 
 func handle_attack_click(clicked_cell: Vector2i):
 
-	var clicked_unit = get_unit_at(clicked_cell)
+	var clicked_unit = unit_query.get_unit_at(
+		units,
+		clicked_cell
+	)
 
-	if is_enemy_unit(clicked_unit):
+	if unit_query.is_enemy_unit(
+		units,
+		selected_unit,
+		clicked_unit
+	):
 		start_attack_confirmation(clicked_unit)
 
 
@@ -1588,9 +1576,16 @@ func handle_attack_click(clicked_cell: Vector2i):
 
 func handle_heal_click(clicked_cell: Vector2i):
 
-	var clicked_unit = get_unit_at(clicked_cell)
+	var clicked_unit = unit_query.get_unit_at(
+		units,
+		clicked_cell
+	)
 
-	if is_ally_unit(clicked_unit):
+	if unit_query.is_ally_unit(
+		units,
+		selected_unit,
+		clicked_unit
+	):
 		start_heal_confirmation(clicked_unit)
 
 
@@ -2046,113 +2041,6 @@ func recover_idle_player_healers():
 			unit["max_heal_charges"]
 		)
 
-
-# =========================
-# Returns true if selected unit is healer.
-# =========================
-
-func selected_unit_is_healer() -> bool:
-
-	if selected_unit == -1:
-		return false
-
-	return units[selected_unit]["class"] == "healer"
-
-
-# ==================================================
-# TILE / UNIT HELPERS
-# ==================================================
-
-# =========================
-# Returns unit index at a tile.
-#
-# Returns:
-# - unit index
-# - or -1 if empty
-# =========================
-
-func get_unit_at(cell: Vector2i) -> int:
-
-	for i in range(units.size()):
-
-		if units[i]["pos"] == cell:
-			return i
-
-	return -1
-
-
-# =========================
-# Returns true if a tile contains any unit.
-# =========================
-
-func is_tile_occupied(cell: Vector2i) -> bool:
-
-	return get_unit_at(cell) != -1
-
-
-# =========================
-# Returns true if selected unit
-# considers target unit an enemy.
-# =========================
-
-func is_enemy_unit(target_unit: int) -> bool:
-
-	if selected_unit == -1:
-		return false
-
-	if target_unit == -1:
-		return false
-
-	return (
-		units[target_unit]["team"]
-		!= units[selected_unit]["team"]
-	)
-
-
-# =========================
-# Returns true if selected unit
-# considers target unit an ally.
-# =========================
-
-func is_ally_unit(target_unit: int) -> bool:
-
-	if selected_unit == -1:
-		return false
-
-	if target_unit == -1:
-		return false
-
-	return (
-		units[target_unit]["team"]
-		== units[selected_unit]["team"]
-	)
-
-
-# =========================
-# Returns enemy-occupied tiles.
-#
-# Used to prevent movement through enemies.
-# =========================
-
-func get_enemy_occupied_tiles(
-	unit_index: int
-) -> Array[Vector2i]:
-
-	var occupied: Array[Vector2i] = []
-
-	var unit_team = units[unit_index]["team"]
-
-	for i in range(units.size()):
-
-		if i == unit_index:
-			continue
-
-		if units[i]["team"] != unit_team:
-			occupied.append(units[i]["pos"])
-
-	return occupied
-
-
 # ==================================================
 # HOVER HELPERS
 # ==================================================
@@ -2186,9 +2074,16 @@ func is_hovering_attackable_enemy() -> bool:
 	if not attack_tiles.has(hovered_cell):
 		return false
 
-	var hovered_unit = get_unit_at(hovered_cell)
+	var hovered_unit = unit_query.get_unit_at(
+		units,
+		hovered_cell
+	)
 
-	return is_enemy_unit(hovered_unit)
+	return unit_query.is_enemy_unit(
+		units,
+		selected_unit,
+		hovered_unit
+	)
 
 
 # =========================
@@ -2199,7 +2094,10 @@ func is_hovering_attackable_enemy() -> bool:
 
 func is_hovering_healable_ally() -> bool:
 
-	if not selected_unit_is_healer():
+	if not unit_query.selected_unit_is_healer(
+		units,
+		selected_unit
+	):
 		return false
 
 	if not has_pending_move():
@@ -2213,9 +2111,16 @@ func is_hovering_healable_ally() -> bool:
 	if not heal_tiles.has(hovered_cell):
 		return false
 
-	var hovered_unit = get_unit_at(hovered_cell)
+	var hovered_unit = unit_query.get_unit_at(
+		units,
+		hovered_cell
+	)
 
-	return is_ally_unit(hovered_unit)
+	return unit_query.is_ally_unit(
+		units,
+		selected_unit,
+		hovered_unit
+	)
 
 
 # ==================================================

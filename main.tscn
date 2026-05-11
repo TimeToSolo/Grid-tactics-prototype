@@ -6,6 +6,8 @@
 [ext_resource type="Script" uid="uid://cnxwwu5kveh3m" path="res://combat_logic.gd" id="4_7mycd"]
 [ext_resource type="Script" uid="uid://chetvakrq2tmk" path="res://turn_manager.gd" id="5_lquwl"]
 [ext_resource type="Script" uid="uid://dtib2g08hm322" path="res://unit_data.gd" id="6_7mycd"]
+[ext_resource type="Script" uid="uid://dtmckp0axqj56" path="res://battle_setup.gd" id="7_272bh"]
+[ext_resource type="Script" uid="uid://daxpo50rrva8j" path="res://unit_query.gd" id="8_5vw27"]
 
 [node name="Main" type="Node2D" unique_id=370152938]
 script = ExtResource("1_ig7tw")
@@ -24,3 +26,9 @@ script = ExtResource("5_lquwl")
 
 [node name="UnitData" type="Node" parent="." unique_id=2056336272]
 script = ExtResource("6_7mycd")
+
+[node name="BattleSetup" type="Node" parent="." unique_id=26088398]
+script = ExtResource("7_272bh")
+
+[node name="UnitQuery" type="Node" parent="." unique_id=543358470]
+script = ExtResource("8_5vw27")

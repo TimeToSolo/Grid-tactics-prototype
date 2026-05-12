@@ -115,7 +115,151 @@ var editor_palette := "terrain"
 var selected_editor_unit_class := "fighter"
 
 # Starting facing direction for newly placed editor units.
-var selected_editor_facing: Vector2i = Vector2i(0, 1)
+var selected_editor_facing: Vector2i = Vector2i(0, -1)
+
+# True while the editor resize prompt is active.
+var editor_resize_mode := false
+
+# Preview width before confirming resize.
+var editor_resize_width := 20
+
+# Preview height before confirming resize.
+var editor_resize_height := 16
+
+# True while dragging a selection rectangle.
+var editor_select_dragging := false
+
+# Start cell for editor selection rectangle.
+var editor_select_start_cell: Vector2i = Vector2i(-1, -1)
+
+# Selected rectangle start.
+var editor_selected_rect_start: Vector2i = Vector2i(-1, -1)
+
+# Selected rectangle end.
+var editor_selected_rect_end: Vector2i = Vector2i(-1, -1)
+
+# True while dragging a selected editor area.
+var editor_move_dragging := false
+
+# Cell where selected-area move drag began.
+var editor_move_start_cell: Vector2i = Vector2i(-1, -1)
+
+func editor_cell_is_inside_selected_area(cell: Vector2i) -> bool:
+
+	if editor_selected_rect_start == Vector2i(-1, -1):
+		return false
+
+	if editor_selected_rect_end == Vector2i(-1, -1):
+		return false
+
+	return (
+		cell.x >= editor_selected_rect_start.x
+		and cell.x <= editor_selected_rect_end.x
+		and cell.y >= editor_selected_rect_start.y
+		and cell.y <= editor_selected_rect_end.y
+	)
+
+# =========================
+# Handles map resize prompt input.
+# =========================
+
+func handle_editor_resize_input(event):
+
+	match event.keycode:
+
+		KEY_RIGHT:
+			editor_resize_width += 1
+
+		KEY_LEFT:
+			editor_resize_width = max(1, editor_resize_width - 1)
+
+		KEY_DOWN:
+			editor_resize_height += 1
+
+		KEY_UP:
+			editor_resize_height = max(1, editor_resize_height - 1)
+
+		KEY_ENTER:
+			map_data.resize_map(
+				editor_resize_width,
+				editor_resize_height
+			)
+
+			editor_resize_mode = false
+
+		KEY_ESCAPE:
+			editor_resize_mode = false
+
+	queue_redraw()
+	
+# =========================
+# Draws map resize prompt.
+# =========================
+
+func draw_editor_resize_ui():
+
+	if not editor_resize_mode:
+		return
+
+	draw_rect(
+		Rect2(12, 120, 360, 130),
+		Color(0.0, 0.0, 0.0, 0.75)
+	)
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(24, 150),
+		"MAP SIZE",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		18,
+		Color.WHITE
+	)
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(24, 180),
+		"Width: " + str(editor_resize_width) + "   Left/Right",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		16,
+		Color.WHITE
+	)
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(24, 205),
+		"Height: " + str(editor_resize_height) + "   Up/Down",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		16,
+		Color.WHITE
+	)
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(24, 235),
+		"Enter: confirm   Esc: cancel",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		16,
+		Color.YELLOW
+	)
+
+# =========================
+# Starts map resize mode.
+# =========================
+
+func start_editor_resize_mode():
+
+	if not editor_mode:
+		return
+
+	editor_resize_mode = true
+	editor_resize_width = map_data.grid_width
+	editor_resize_height = map_data.grid_height
+
+	queue_redraw()
 
 # ==================================================
 # ATTACK / HEAL STATE
@@ -155,6 +299,113 @@ var coverage_mode = 0
 var turn_number = 1
 
 # =========================
+# Draws destination preview
+# while moving selected area.
+# =========================
+
+func draw_editor_move_preview():
+
+	if not editor_mode:
+		return
+
+	if editor_palette != "select":
+		return
+
+	if not editor_move_dragging:
+		return
+
+	var offset = hovered_cell - editor_move_start_cell
+
+	var preview_start = editor_selected_rect_start + offset
+	var preview_end = editor_selected_rect_end + offset
+
+	for y in range(preview_start.y, preview_end.y + 1):
+		for x in range(preview_start.x, preview_end.x + 1):
+
+			var cell = Vector2i(x, y)
+
+			if not map_data.is_inside_grid(cell):
+				continue
+
+			draw_rect(
+				map_data.grid_rect(cell),
+				Color(0.0, 1.0, 1.0, 0.35)
+			)
+
+# =========================
+# Draws selected editor area.
+# =========================
+
+func draw_editor_selected_area():
+
+	if not editor_mode:
+		return
+
+	if editor_palette != "select":
+		return
+
+	if editor_selected_rect_start == Vector2i(-1, -1):
+		return
+
+	if editor_selected_rect_end == Vector2i(-1, -1):
+		return
+
+	var min_x = min(editor_selected_rect_start.x, editor_selected_rect_end.x)
+	var max_x = max(editor_selected_rect_start.x, editor_selected_rect_end.x)
+
+	var min_y = min(editor_selected_rect_start.y, editor_selected_rect_end.y)
+	var max_y = max(editor_selected_rect_start.y, editor_selected_rect_end.y)
+
+	for y in range(min_y, max_y + 1):
+		for x in range(min_x, max_x + 1):
+
+			var cell = Vector2i(x, y)
+
+			if not map_data.is_inside_grid(cell):
+				continue
+
+			draw_rect(
+				map_data.grid_rect(cell),
+				Color(1.0, 1.0, 0.0, 0.25)
+			)
+			
+
+# =========================
+# Draws live select rectangle
+# while Ctrl-dragging.
+# =========================
+
+func draw_editor_select_drag_preview():
+
+	if not editor_mode:
+		return
+
+	if editor_palette != "select":
+		return
+
+	if not editor_select_dragging:
+		return
+
+	var min_x = min(editor_select_start_cell.x, hovered_cell.x)
+	var max_x = max(editor_select_start_cell.x, hovered_cell.x)
+
+	var min_y = min(editor_select_start_cell.y, hovered_cell.y)
+	var max_y = max(editor_select_start_cell.y, hovered_cell.y)
+
+	for y in range(min_y, max_y + 1):
+		for x in range(min_x, max_x + 1):
+
+			var cell = Vector2i(x, y)
+
+			if not map_data.is_inside_grid(cell):
+				continue
+
+			draw_rect(
+				map_data.grid_rect(cell),
+				Color(1.0, 1.0, 0.0, 0.35)
+			)
+
+# =========================
 # Draws editor mode controls
 # and highlights selected option.
 # =========================
@@ -169,21 +420,55 @@ func draw_editor_ui():
 	var font_size = 16
 	var spacing = 95
 
+	var top_y = y
+	var palette_y = y + 24
+	var option_y = y + 48
+	var action_y = y + 72
+	var facing_y = y + 96
+
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(x, y),
-		"EDITOR MODE | [TAB]",
+		Vector2(x, top_y),
+		"EDITOR MODE",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
 		font_size,
 		Color.WHITE
 	)
 
-	var palette_position_x = x + 180
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(x + 190, top_y),
+		"[TAB] Palette",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_size,
+		Color.WHITE
+	)
 
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(palette_position_x, y),
+		Vector2(x + 360, top_y),
+		"[M] Resize",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_size,
+		Color.WHITE
+	)
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(x + 520, top_y),
+		"[E] Exit",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_size,
+		Color.WHITE
+	)
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(x, palette_y),
 		"Terrain",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
@@ -193,7 +478,7 @@ func draw_editor_ui():
 
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(palette_position_x + 90, y),
+		Vector2(x + 110, palette_y),
 		"Player",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
@@ -203,7 +488,7 @@ func draw_editor_ui():
 
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(palette_position_x + 170, y),
+		Vector2(x + 210, palette_y),
 		"Enemy",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
@@ -213,19 +498,19 @@ func draw_editor_ui():
 
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(palette_position_x + 260, y),
-		"| [E] Exit",
+		Vector2(x + 310, palette_y),
+		"Select",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
 		font_size,
-		Color.WHITE
+		Color.YELLOW if editor_palette == "select" else Color.WHITE
 	)
 
 	if editor_palette == "terrain":
 
 		draw_string(
 			ThemeDB.fallback_font,
-			Vector2(x, y + 24),
+			Vector2(x, option_y),
 			"[1] Grass",
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
@@ -235,7 +520,7 @@ func draw_editor_ui():
 
 		draw_string(
 			ThemeDB.fallback_font,
-			Vector2(x + spacing, y + 24),
+			Vector2(x + spacing, option_y),
 			"[2] Wall",
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
@@ -245,7 +530,7 @@ func draw_editor_ui():
 
 		draw_string(
 			ThemeDB.fallback_font,
-			Vector2(x + spacing * 2, y + 24),
+			Vector2(x + spacing * 2, option_y),
 			"[3] River",
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
@@ -253,11 +538,14 @@ func draw_editor_ui():
 			Color.YELLOW if selected_editor_tile == "R" else Color.WHITE
 		)
 
-	else:
+	elif (
+		editor_palette == "player_unit"
+		or editor_palette == "enemy_unit"
+	):
 
 		draw_string(
 			ThemeDB.fallback_font,
-			Vector2(x, y + 24),
+			Vector2(x, option_y),
 			"[1] Fighter",
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
@@ -267,7 +555,7 @@ func draw_editor_ui():
 
 		draw_string(
 			ThemeDB.fallback_font,
-			Vector2(x + spacing, y + 24),
+			Vector2(x + spacing, option_y),
 			"[2] Tank",
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
@@ -277,7 +565,7 @@ func draw_editor_ui():
 
 		draw_string(
 			ThemeDB.fallback_font,
-			Vector2(x + spacing * 2, y + 24),
+			Vector2(x + spacing * 2, option_y),
 			"[3] Lancer",
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
@@ -287,17 +575,17 @@ func draw_editor_ui():
 
 		draw_string(
 			ThemeDB.fallback_font,
-			Vector2(x + spacing * 3, y + 24),
+			Vector2(x + spacing * 3, option_y),
 			"[4] Duelist",
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
 			font_size,
 			Color.YELLOW if selected_editor_unit_class == "duelist" else Color.WHITE
 		)
-		
+
 		draw_string(
 			ThemeDB.fallback_font,
-			Vector2(x + spacing * 4, y + 24),
+			Vector2(x + spacing * 4, option_y),
 			"[5] Healer",
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
@@ -307,7 +595,7 @@ func draw_editor_ui():
 
 		draw_string(
 			ThemeDB.fallback_font,
-			Vector2(x + spacing * 5, y + 24),
+			Vector2(x + spacing * 5, option_y),
 			"[6] Archer",
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
@@ -315,45 +603,71 @@ func draw_editor_ui():
 			Color.YELLOW if selected_editor_unit_class == "archer" else Color.WHITE
 		)
 
-	var action_text = "Left click: place/paint | Right click: remove/erase | Ctrl+drag: rectangle fill"
+	if editor_palette == "select":
 
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(x, y + 48),
-		action_text,
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		font_size,
-		Color.WHITE
-	)
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(x, action_y),
+			"Drag: select area | Right click: deselect",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			font_size,
+			Color.YELLOW
+		)
 
-	var facing_text = "Facing: " + str(selected_editor_facing) + " | [F] Rotate"
+	else:
 
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(x, y + 72),
-		facing_text,
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		font_size,
-		Color.WHITE
-	)
+		var action_text = "Left click: place/paint | Right click: remove/erase | Ctrl+drag: rectangle fill"
+
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(x, action_y),
+			action_text,
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			font_size,
+			Color.WHITE
+		)
+
+		var facing_text = "Facing: " + str(selected_editor_facing) + " | [F] Rotate"
+
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(x, facing_y),
+			facing_text,
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			font_size,
+			Color.WHITE
+		)
 
 # =========================
 # Rotates editor unit facing
-# clockwise.
+# clockwise through 8 directions.
 # =========================
 
 func rotate_editor_facing():
 
-	if selected_editor_facing == Vector2i(0, -1):
-		selected_editor_facing = Vector2i(1, 0)
-	elif selected_editor_facing == Vector2i(1, 0):
-		selected_editor_facing = Vector2i(0, 1)
-	elif selected_editor_facing == Vector2i(0, 1):
-		selected_editor_facing = Vector2i(-1, 0)
-	else:
+	var directions = [
+		Vector2i(0, -1),   # N
+		Vector2i(1, -1),   # NE
+		Vector2i(1, 0),    # E
+		Vector2i(1, 1),    # SE
+		Vector2i(0, 1),    # S
+		Vector2i(-1, 1),   # SW
+		Vector2i(-1, 0),   # W
+		Vector2i(-1, -1)   # NW
+	]
+
+	var current_index = directions.find(selected_editor_facing)
+
+	if current_index == -1:
 		selected_editor_facing = Vector2i(0, -1)
+		return
+
+	var next_index = (current_index + 1) % directions.size()
+
+	selected_editor_facing = directions[next_index]
 
 	queue_redraw()
 
@@ -370,6 +684,8 @@ func cycle_editor_palette():
 		editor_palette = "player_unit"
 	elif editor_palette == "player_unit":
 		editor_palette = "enemy_unit"
+	elif editor_palette == "enemy_unit":
+		editor_palette = "select"
 	else:
 		editor_palette = "terrain"
 
@@ -574,8 +890,11 @@ func _draw():
 	)
 
 	draw_editor_rect_preview()
+	draw_editor_select_drag_preview()
+	draw_editor_selected_area()
+	draw_editor_move_preview()
 	draw_editor_ui()
-
+	draw_editor_resize_ui()
 
 # =========================
 # Draws the inspected enemy's
@@ -653,6 +972,7 @@ func draw_inspected_enemy_attack_range():
 
 func _ready():
 
+	map_data.normalize_terrain_rows()
 	units = battle_setup.create_battle_units(unit_data)
 
 	queue_redraw()
@@ -735,6 +1055,10 @@ func handle_keyboard_input(event):
 	if not event.pressed:
 		return
 
+	if editor_resize_mode:
+		handle_editor_resize_input(event)
+		return
+
 	match event.keycode:
 
 		KEY_E:
@@ -747,6 +1071,9 @@ func handle_keyboard_input(event):
 		KEY_F:
 			if editor_mode:
 				rotate_editor_facing()
+				
+		KEY_M:
+			start_editor_resize_mode()
 
 		KEY_TAB:
 			cycle_editor_palette()
@@ -912,6 +1239,17 @@ func handle_mouse_input(event):
 
 		if editor_mode:
 
+			if editor_palette == "select":
+
+				editor_selected_rect_start = Vector2i(-1, -1)
+				editor_selected_rect_end = Vector2i(-1, -1)
+
+				editor_select_dragging = false
+				editor_select_start_cell = Vector2i(-1, -1)
+
+				queue_redraw()
+				return
+
 			if editor_palette == "terrain":
 
 				editor_system.paint_tile(
@@ -951,12 +1289,66 @@ func handle_mouse_input(event):
 
 			if event.pressed:
 
+				if editor_palette == "select":
+
+					if editor_cell_is_inside_selected_area(hovered_cell):
+
+						editor_move_dragging = true
+						editor_move_start_cell = hovered_cell
+
+					else:
+
+						editor_select_dragging = true
+						editor_select_start_cell = hovered_cell
+
+					return
+
 				if event.ctrl_pressed:
+
 					editor_rect_dragging = true
 					editor_rect_start_cell = hovered_cell
 					return
 
 				handle_left_click()
+				return
+
+			if not event.pressed and editor_move_dragging:
+
+				var offset = hovered_cell - editor_move_start_cell
+
+				editor_system.move_selection(
+					map_data,
+					units,
+					editor_selected_rect_start,
+					editor_selected_rect_end,
+					offset
+				)
+
+				editor_selected_rect_start += offset
+				editor_selected_rect_end += offset
+
+				editor_move_dragging = false
+				editor_move_start_cell = Vector2i(-1, -1)
+
+				queue_redraw()
+				return
+
+			if not event.pressed and editor_select_dragging:
+
+				editor_selected_rect_start = Vector2i(
+					min(editor_select_start_cell.x, hovered_cell.x),
+					min(editor_select_start_cell.y, hovered_cell.y)
+				)
+
+				editor_selected_rect_end = Vector2i(
+					max(editor_select_start_cell.x, hovered_cell.x),
+					max(editor_select_start_cell.y, hovered_cell.y)
+				)
+
+				editor_select_dragging = false
+				editor_select_start_cell = Vector2i(-1, -1)
+
+				queue_redraw()
 				return
 
 			if not event.pressed and editor_rect_dragging:

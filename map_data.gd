@@ -13,10 +13,45 @@ extends Node
 # ==================================================
 
 const TILE_SIZE = 64
-const GRID_WIDTH = 16
-const GRID_HEIGHT = 12
-const UI_HEIGHT = 112
+var grid_width = 20
+var grid_height = 16
+const UI_HEIGHT = 144
 
+# =========================
+# Resizes the map terrain grid.
+#
+# Existing tiles are preserved
+# where possible. New cells are
+# filled with grass.
+# =========================
+
+func resize_map(
+	new_width: int,
+	new_height: int
+):
+
+	var new_terrain_map = []
+
+	for y in range(new_height):
+
+		var new_row = ""
+
+		for x in range(new_width):
+
+			if (
+				y < terrain_map.size()
+				and x < terrain_map[y].length()
+			):
+				new_row += terrain_map[y][x]
+			else:
+				new_row += "."
+
+		new_terrain_map.append(new_row)
+
+	terrain_map = new_terrain_map
+
+	grid_width = new_width
+	grid_height = new_height
 
 # ==================================================
 # TERRAIN DATA
@@ -73,6 +108,24 @@ var terrain_types = {
 	}
 }
 
+# =========================
+# Rebuilds terrain rows to
+# exactly match grid width.
+# =========================
+
+func normalize_terrain_rows():
+
+	for y in range(terrain_map.size()):
+
+		var row = terrain_map[y]
+
+		while row.length() < grid_width:
+			row += "."
+
+		if row.length() > grid_width:
+			row = row.substr(0, grid_width)
+
+		terrain_map[y] = row
 
 # ==================================================
 # GRID / WORLD CONVERSION
@@ -181,9 +234,9 @@ func get_tile_move_cost(cell: Vector2i) -> int:
 func is_inside_grid(cell: Vector2i) -> bool:
 	return (
 		cell.x >= 0
-		and cell.x < GRID_WIDTH
+		and cell.x < grid_width
 		and cell.y >= 0
-		and cell.y < GRID_HEIGHT
+		and cell.y < grid_height
 	)
 
 

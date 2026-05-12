@@ -108,3 +108,143 @@ func place_unit(
 	)
 
 	units.append(unit)
+
+# =========================
+# Moves terrain and units inside
+# a selected rectangle by offset.
+#
+# Cancels if the move would place
+# anything outside the map.
+# =========================
+
+func move_selection(
+	map_data,
+	units: Array,
+	start_cell: Vector2i,
+	end_cell: Vector2i,
+	offset: Vector2i
+):
+
+	if offset == Vector2i.ZERO:
+		return
+
+	var copied_tiles = []
+	var copied_units = []
+
+	# =========================
+	# First verify destination
+	# stays inside map.
+	# =========================
+
+	for y in range(start_cell.y, end_cell.y + 1):
+		for x in range(start_cell.x, end_cell.x + 1):
+
+			var source_cell = Vector2i(x, y)
+			var target_cell = source_cell + offset
+
+			if not map_data.is_inside_grid(source_cell):
+				return
+
+			if not map_data.is_inside_grid(target_cell):
+				return
+
+	# =========================
+	# Copy terrain.
+	# =========================
+
+	for y in range(start_cell.y, end_cell.y + 1):
+		for x in range(start_cell.x, end_cell.x + 1):
+
+			var source_cell = Vector2i(x, y)
+
+			copied_tiles.append({
+				"cell": source_cell,
+				"symbol": map_data.get_tile_symbol(source_cell)
+			})
+
+	# =========================
+	# Copy units inside selection.
+	# =========================
+
+	for unit in units:
+
+		var pos = unit["pos"]
+
+		if (
+			pos.x >= start_cell.x
+			and pos.x <= end_cell.x
+			and pos.y >= start_cell.y
+			and pos.y <= end_cell.y
+		):
+			copied_units.append(unit.duplicate(true))
+
+	# =========================
+	# Clear source terrain.
+	# =========================
+
+	for tile_data in copied_tiles:
+
+		paint_tile(
+			map_data,
+			tile_data["cell"],
+			"."
+		)
+
+	# =========================
+	# Remove source units.
+	# =========================
+
+	for i in range(units.size() - 1, -1, -1):
+
+		var pos = units[i]["pos"]
+
+		if (
+			pos.x >= start_cell.x
+			and pos.x <= end_cell.x
+			and pos.y >= start_cell.y
+			and pos.y <= end_cell.y
+		):
+			units.remove_at(i)
+
+	# =========================
+	# Remove units currently occupying
+	# destination cells.
+	#
+	# Moved units replace existing units
+	# instead of stacking on top of them.
+	# =========================
+
+	for i in range(units.size() - 1, -1, -1):
+
+		var pos = units[i]["pos"]
+
+		for tile_data in copied_tiles:
+
+			var target_cell = tile_data["cell"] + offset
+
+			if pos == target_cell:
+				units.remove_at(i)
+				break
+
+	# =========================
+	# Paint terrain at destination.
+	# =========================
+
+	for tile_data in copied_tiles:
+
+		var target_cell = tile_data["cell"] + offset
+
+		paint_tile(
+			map_data,
+			target_cell,
+			tile_data["symbol"]
+		)
+
+	# =========================
+	# Place copied units at destination.
+	# =========================
+
+	for unit in copied_units:
+
+		unit["pos"] += offset
+		units.append(unit)

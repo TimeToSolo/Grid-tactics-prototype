@@ -17,8 +17,8 @@ func draw_grid(
 	map_data
 ):
 
-	for y in range(map_data.GRID_HEIGHT):
-		for x in range(map_data.GRID_WIDTH):
+	for y in range(map_data.grid_height):
+		for x in range(map_data.grid_width):
 
 			var cell = Vector2i(x, y)
 			var rect = map_data.grid_rect(cell)

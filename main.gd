@@ -107,6 +107,16 @@ var editor_rect_dragging := false
 # Starting cell for Ctrl + left-click rectangle fill.
 var editor_rect_start_cell: Vector2i = Vector2i(-1, -1)
 
+# Current editor placement mode.
+# "terrain", "player_unit", or "enemy_unit".
+var editor_palette := "terrain"
+
+# Currently selected unit class for editor placement.
+var selected_editor_unit_class := "fighter"
+
+# Starting facing direction for newly placed editor units.
+var selected_editor_facing: Vector2i = Vector2i(0, 1)
+
 # ==================================================
 # ATTACK / HEAL STATE
 # ==================================================
@@ -146,7 +156,7 @@ var turn_number = 1
 
 # =========================
 # Draws editor mode controls
-# and highlights selected tile.
+# and highlights selected option.
 # =========================
 
 func draw_editor_ui():
@@ -162,52 +172,208 @@ func draw_editor_ui():
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(x, y),
-		"EDITOR MODE |",
+		"EDITOR MODE | [TAB]",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
 		font_size,
 		Color.WHITE
 	)
 
+	var palette_position_x = x + 180
+
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(x + spacing * 2, y),
-		"[1] Grass",
+		Vector2(palette_position_x, y),
+		"Terrain",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
 		font_size,
-		Color.YELLOW if selected_editor_tile == "." else Color.WHITE
+		Color.YELLOW if editor_palette == "terrain" else Color.WHITE
 	)
 
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(x + spacing * 3, y),
-		"[2] Wall",
+		Vector2(palette_position_x + 90, y),
+		"Player",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
 		font_size,
-		Color.YELLOW if selected_editor_tile == "W" else Color.WHITE
+		Color.CORNFLOWER_BLUE if editor_palette == "player_unit" else Color.WHITE
 	)
 
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(x + spacing * 4, y),
-		"[3] River",
+		Vector2(palette_position_x + 170, y),
+		"Enemy",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
 		font_size,
-		Color.YELLOW if selected_editor_tile == "R" else Color.WHITE
+		Color.INDIAN_RED if editor_palette == "enemy_unit" else Color.WHITE
 	)
 
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(x + spacing * 5, y),
-		"[E] Exit",
+		Vector2(palette_position_x + 260, y),
+		"| [E] Exit",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
 		font_size,
 		Color.WHITE
 	)
+
+	if editor_palette == "terrain":
+
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(x, y + 24),
+			"[1] Grass",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			font_size,
+			Color.YELLOW if selected_editor_tile == "." else Color.WHITE
+		)
+
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(x + spacing, y + 24),
+			"[2] Wall",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			font_size,
+			Color.YELLOW if selected_editor_tile == "W" else Color.WHITE
+		)
+
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(x + spacing * 2, y + 24),
+			"[3] River",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			font_size,
+			Color.YELLOW if selected_editor_tile == "R" else Color.WHITE
+		)
+
+	else:
+
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(x, y + 24),
+			"[1] Fighter",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			font_size,
+			Color.YELLOW if selected_editor_unit_class == "fighter" else Color.WHITE
+		)
+
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(x + spacing, y + 24),
+			"[2] Tank",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			font_size,
+			Color.YELLOW if selected_editor_unit_class == "tank" else Color.WHITE
+		)
+
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(x + spacing * 2, y + 24),
+			"[3] Lancer",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			font_size,
+			Color.YELLOW if selected_editor_unit_class == "lancer" else Color.WHITE
+		)
+
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(x + spacing * 3, y + 24),
+			"[4] Duelist",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			font_size,
+			Color.YELLOW if selected_editor_unit_class == "duelist" else Color.WHITE
+		)
+		
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(x + spacing * 4, y + 24),
+			"[5] Healer",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			font_size,
+			Color.YELLOW if selected_editor_unit_class == "healer" else Color.WHITE
+		)
+
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(x + spacing * 5, y + 24),
+			"[6] Archer",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			font_size,
+			Color.YELLOW if selected_editor_unit_class == "archer" else Color.WHITE
+		)
+
+	var action_text = "Left click: place/paint | Right click: remove/erase | Ctrl+drag: rectangle fill"
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(x, y + 48),
+		action_text,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_size,
+		Color.WHITE
+	)
+
+	var facing_text = "Facing: " + str(selected_editor_facing) + " | [F] Rotate"
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(x, y + 72),
+		facing_text,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_size,
+		Color.WHITE
+	)
+
+# =========================
+# Rotates editor unit facing
+# clockwise.
+# =========================
+
+func rotate_editor_facing():
+
+	if selected_editor_facing == Vector2i(0, -1):
+		selected_editor_facing = Vector2i(1, 0)
+	elif selected_editor_facing == Vector2i(1, 0):
+		selected_editor_facing = Vector2i(0, 1)
+	elif selected_editor_facing == Vector2i(0, 1):
+		selected_editor_facing = Vector2i(-1, 0)
+	else:
+		selected_editor_facing = Vector2i(0, -1)
+
+	queue_redraw()
+
+# =========================
+# Cycles editor palette mode.
+# =========================
+
+func cycle_editor_palette():
+
+	if not editor_mode:
+		return
+
+	if editor_palette == "terrain":
+		editor_palette = "player_unit"
+	elif editor_palette == "player_unit":
+		editor_palette = "enemy_unit"
+	else:
+		editor_palette = "terrain"
+
+	queue_redraw()
 
 # =========================
 # Draws rectangle fill preview
@@ -507,6 +673,7 @@ func _process(_delta):
 
 	if (
 		editor_mode
+		and editor_palette == "terrain"
 		and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 		and not Input.is_key_pressed(KEY_CTRL)
 		and not editor_rect_dragging
@@ -576,15 +743,43 @@ func handle_keyboard_input(event):
 			clear_pending_action_state()
 
 			queue_redraw()
+			
+		KEY_F:
+			if editor_mode:
+				rotate_editor_facing()
+
+		KEY_TAB:
+			cycle_editor_palette()
 
 		KEY_1:
-			selected_editor_tile = "."
+			if editor_palette == "terrain":
+				selected_editor_tile = "."
+			else:
+				selected_editor_unit_class = "fighter"
 
 		KEY_2:
-			selected_editor_tile = "W"
+			if editor_palette == "terrain":
+				selected_editor_tile = "W"
+			else:
+				selected_editor_unit_class = "tank"
 
 		KEY_3:
-			selected_editor_tile = "R"
+			if editor_palette == "terrain":
+				selected_editor_tile = "R"
+			else:
+				selected_editor_unit_class = "lancer"
+
+		KEY_4:
+			if editor_palette != "terrain":
+				selected_editor_unit_class = "duelist"
+				
+		KEY_5:
+			if editor_palette != "terrain":
+				selected_editor_unit_class = "healer"
+
+		KEY_6:
+			if editor_palette != "terrain":
+				selected_editor_unit_class = "archer"
 
 		KEY_C:
 			cycle_coverage_mode()
@@ -713,26 +908,28 @@ func handle_mouse_input(event):
 	# Right click behavior
 	# =========================
 
-	if event.button_index == MOUSE_BUTTON_RIGHT:
-
-		# =========================
-		# Editor mode terrain erase
-		# =========================
+	if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 
 		if editor_mode:
 
-			editor_system.paint_tile(
-				map_data,
-				hovered_cell,
-				"."
-			)
+			if editor_palette == "terrain":
+
+				editor_system.paint_tile(
+					map_data,
+					hovered_cell,
+					"."
+				)
+
+			else:
+
+				editor_system.remove_unit_at(
+					units,
+					unit_query,
+					hovered_cell
+				)
 
 			queue_redraw()
 			return
-
-		# =========================
-		# Clear inspected enemy first
-		# =========================
 
 		if inspected_enemy != -1:
 			inspected_enemy = -1
@@ -742,11 +939,10 @@ func handle_mouse_input(event):
 		clear_pending_action_state()
 
 		queue_redraw()
-
 		return
 
 	# =========================
-	# Left click = normal selection/action
+	# Left click behavior
 	# =========================
 
 	if event.button_index == MOUSE_BUTTON_LEFT:
@@ -760,35 +956,26 @@ func handle_mouse_input(event):
 					editor_rect_start_cell = hovered_cell
 					return
 
-				editor_system.paint_tile(
+				handle_left_click()
+				return
+
+			if not event.pressed and editor_rect_dragging:
+
+				editor_system.fill_rect(
 					map_data,
+					editor_rect_start_cell,
 					hovered_cell,
 					selected_editor_tile
 				)
 
+				editor_rect_dragging = false
+				editor_rect_start_cell = Vector2i(-1, -1)
+
 				queue_redraw()
 				return
 
-			if not event.pressed:
-
-				if editor_rect_dragging:
-
-					editor_system.fill_rect(
-						map_data,
-						editor_rect_start_cell,
-						hovered_cell,
-						selected_editor_tile
-					)
-
-					editor_rect_dragging = false
-					editor_rect_start_cell = Vector2i(-1, -1)
-
-					queue_redraw()
-					return
-
 		if event.pressed:
 			handle_left_click()
-
 
 # =========================
 # Main left-click handler.
@@ -807,11 +994,39 @@ func handle_left_click():
 
 	if editor_mode:
 
-		editor_system.paint_tile(
-			map_data,
-			clicked_cell,
-			selected_editor_tile
-		)
+		if editor_palette == "terrain":
+
+			editor_system.paint_tile(
+				map_data,
+				clicked_cell,
+				selected_editor_tile
+			)
+
+		elif editor_palette == "player_unit":
+
+			editor_system.place_unit(
+				units,
+				unit_query,
+				unit_data,
+				map_data,
+				clicked_cell,
+				selected_editor_unit_class,
+				"player",
+				selected_editor_facing
+			)
+
+		elif editor_palette == "enemy_unit":
+
+			editor_system.place_unit(
+				units,
+				unit_query,
+				unit_data,
+				map_data,
+				clicked_cell,
+				selected_editor_unit_class,
+				"enemy",
+				selected_editor_facing
+			)
 
 		queue_redraw()
 		return

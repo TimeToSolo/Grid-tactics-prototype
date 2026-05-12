@@ -15,7 +15,7 @@ extends Node
 const TILE_SIZE = 64
 const GRID_WIDTH = 16
 const GRID_HEIGHT = 12
-const UI_HEIGHT = 48
+const UI_HEIGHT = 112
 
 
 # ==================================================

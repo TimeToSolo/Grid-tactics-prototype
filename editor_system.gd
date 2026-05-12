@@ -49,3 +49,62 @@ func fill_rect(
 				Vector2i(x, y),
 				tile_symbol
 			)
+
+# =========================
+# Removes any unit at a cell.
+# =========================
+
+func remove_unit_at(
+	units: Array,
+	unit_query,
+	cell: Vector2i
+):
+
+	var unit_index = unit_query.get_unit_at(
+		units,
+		cell
+	)
+
+	if unit_index == -1:
+		return
+
+	units.remove_at(unit_index)
+
+
+# =========================
+# Places a unit at a cell.
+#
+# Uses UnitData templates.
+# =========================
+
+func place_unit(
+	units: Array,
+	unit_query,
+	unit_data,
+	map_data,
+	cell: Vector2i,
+	unit_class: String,
+	team: String,
+	facing: Vector2i
+):
+
+	if not map_data.is_inside_grid(cell):
+		return
+
+	if map_data.blocks_movement(cell):
+		return
+
+	remove_unit_at(
+		units,
+		unit_query,
+		cell
+	)
+
+	var unit = unit_data.create_unit(
+		unit_class,
+		team,
+		cell,
+		facing
+	)
+
+	units.append(unit)

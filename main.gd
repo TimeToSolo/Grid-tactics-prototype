@@ -32,6 +32,7 @@ extends Node2D
 @onready var editor_system = $EditorSystem
 @onready var hover_query = $HoverQuery
 @onready var map_data = $MapData
+@onready var map_serializer = $MapSerializer
 @onready var movement_system = $MovementSystem
 @onready var path_preview_system = $PathPreviewSystem
 @onready var render_system = $RenderSystem
@@ -144,6 +145,46 @@ var editor_move_dragging := false
 # Cell where selected-area move drag began.
 var editor_move_start_cell: Vector2i = Vector2i(-1, -1)
 
+# Current save/load map slot.
+var editor_map_slot := 1
+
+# Total available quick-save slots.
+const MAX_EDITOR_MAP_SLOTS = 9
+
+# =========================
+# Returns current editor map path.
+# =========================
+
+func get_editor_map_path() -> String:
+
+	return "user://maps/map_" + str(editor_map_slot) + ".json"
+
+
+# =========================
+# Changes active editor map slot.
+# =========================
+
+func change_editor_map_slot(direction: int):
+
+	editor_map_slot += direction
+
+	if editor_map_slot < 1:
+		editor_map_slot = MAX_EDITOR_MAP_SLOTS
+
+	if editor_map_slot > MAX_EDITOR_MAP_SLOTS:
+		editor_map_slot = 1
+
+	queue_redraw()
+
+# =========================
+# Returns true if a cell is
+# inside the current selected
+# editor rectangle area.
+#
+# Used for selection movement
+# and drag detection.
+# =========================
+
 func editor_cell_is_inside_selected_area(cell: Vector2i) -> bool:
 
 	if editor_selected_rect_start == Vector2i(-1, -1):
@@ -158,6 +199,33 @@ func editor_cell_is_inside_selected_area(cell: Vector2i) -> bool:
 		and cell.y >= editor_selected_rect_start.y
 		and cell.y <= editor_selected_rect_end.y
 	)
+
+# =========================
+# Saves editor map.
+# =========================
+
+func save_editor_map():
+
+	map_serializer.save_map(
+		map_data,
+		units,
+		get_editor_map_path()
+	)
+	
+# =========================
+# Loads editor map.
+# =========================
+
+func load_editor_map():
+
+	map_serializer.load_map(
+		map_data,
+		units,
+		unit_data,
+		get_editor_map_path()
+	)
+
+	queue_redraw()
 
 # =========================
 # Handles map resize prompt input.
@@ -438,7 +506,17 @@ func draw_editor_ui():
 
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(x + 190, top_y),
+		Vector2(x + 170, top_y),
+		"Slot " + str(editor_map_slot) + " | Ctrl+S Save | Ctrl+L Load | [ ] Slot",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_size,
+		Color.YELLOW
+	)
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(x + 470, top_y),
 		"[TAB] Palette",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
@@ -448,7 +526,7 @@ func draw_editor_ui():
 
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(x + 360, top_y),
+		Vector2(x + 610, top_y),
 		"[M] Resize",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
@@ -458,7 +536,7 @@ func draw_editor_ui():
 
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(x + 520, top_y),
+		Vector2(x + 760, top_y),
 		"[E] Exit",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
@@ -972,8 +1050,19 @@ func draw_inspected_enemy_attack_range():
 
 func _ready():
 
-	map_data.normalize_terrain_rows()
-	units = battle_setup.create_battle_units(unit_data)
+	if FileAccess.file_exists(get_editor_map_path()):
+
+		map_serializer.load_map(
+			map_data,
+			units,
+			unit_data,
+			get_editor_map_path()
+		)
+
+	else:
+
+		map_data.normalize_terrain_rows()
+		units = battle_setup.create_battle_units(unit_data)
 
 	queue_redraw()
 
@@ -1074,9 +1163,27 @@ func handle_keyboard_input(event):
 				
 		KEY_M:
 			start_editor_resize_mode()
+			
+		KEY_S:
+
+			if editor_mode and event.ctrl_pressed:
+				save_editor_map()
+
+		KEY_L:
+
+			if editor_mode and event.ctrl_pressed:
+				load_editor_map()
 
 		KEY_TAB:
 			cycle_editor_palette()
+			
+		KEY_BRACKETLEFT:
+			if editor_mode:
+				change_editor_map_slot(-1)
+
+		KEY_BRACKETRIGHT:
+			if editor_mode:
+				change_editor_map_slot(1)
 
 		KEY_1:
 			if editor_palette == "terrain":

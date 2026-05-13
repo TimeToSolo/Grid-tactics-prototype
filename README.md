@@ -2,50 +2,87 @@
 
 Turn-based tactical combat prototype built in Godot using GDScript.
 
-This project explores tactical combat built around movement, facing, stamina, coverage zones, and formation pressure. The goal is to create battles where positioning matters before attacks happen, defensive lines can hold or collapse, and movement choices create real vulnerability.
+This project explores tactical combat centered around movement, facing, stamina, directional coverage, and battlefield pressure. The goal is to create battles where positioning matters before attacks happen, defensive lines can hold or collapse, and movement itself creates tactical vulnerability.
 
-## Current Features
+Rather than focusing on raw stat trading, the prototype emphasizes formation integrity, controlled advances, retreat pressure, lane denial, and readable battlefield threat.
 
-### Core Combat
+---
 
-- Turn-based grid movement
-- 8-directional facing
-- Directional coverage zones
-- Stamina-based counterattacks
+# Current Features
+
+## Core Combat
+
+- Turn-based grid combat
+- 8-directional facing system
+- Directional coverage/interception zones
+- Stamina-based reaction attacks
 - Delayed coverage reactions after movement confirmation
 - Movement stamina costs
-- Attack, heal, regen, wait, and facing confirmation flow
-- Auto-end turn when all player units are exhausted
+- Attack, heal, regeneration, wait, and facing confirmation flow
+- Auto-end turn when all units on the active team are exhausted
+- Multi-team turn support (`player`, `enemy`, `neutral`, etc.)
 
-### Movement and Pathing
+## Movement and Pathing
 
 - Cursor-traced movement paths
-- Hovered path preview
-- Movement range validation by path length/cost
-- Multiple possible routes to the same tile
-- Dangerous path tiles highlighted before confirming movement
-- Coverage reactions based on the actual path traveled, not just start/end position
+- Hovered path previews
+- Path-based movement validation
+- Multiple valid routes to the same destination
+- Dangerous path tiles highlighted before movement confirmation
+- Coverage reactions calculated from actual movement path traversal
+- Deterministic pathfinding behavior for debugging and testing
 
-### Unit Types
+## Unit Types
 
+- Fighter
 - Tank
 - Duelist
 - Lancer
 - Archer
 - Healer
 
-### Tactical Systems
+## Tactical Systems
 
 - Terrain interaction
-- Blocked tiles
+- Blocked movement tiles
 - Movement costs
-- Ranged attack checks
-- Healing charges
+- Ranged attack validation
+- Healing charge system
 - Regeneration support
 - Directional interception
-- Choke point and fallback-line gameplay
+- Formation pressure
+- Choke point gameplay
+- Fallback-line gameplay
+- Coverage-based positional control
 
-### UI Features
+## AI Systems
+
+- Modular AI profile architecture
+- Per-unit AI behavior assignment
+- Mixed AI behaviors supported within the same faction
+
+### Current AI Profiles
+
+#### Barbarian
+
+- Aggressively pursues nearest enemy
+- Attacks whenever possible
+- Ignores coverage danger
+- Respects movement/facing restrictions
+
+## Editor Features
+
+- Terrain painting
+- Rectangle fill tool
+- Unit placement/removal
+- Save/load map slots
+- Rectangle terrain/unit movement
+- Team assignment
+- Facing assignment
+- AI profile assignment
+- Editor UI overlays
+
+## UI Features
 
 - Movement tile display
 - Path preview display
@@ -56,8 +93,11 @@ This project explores tactical combat built around movement, facing, stamina, co
 - Turn indicator
 - Stamina display
 - Confirmation prompts
+- Threat range inspection for enemy units
 
-## Design Goals
+---
+
+# Design Goals
 
 This prototype is focused on creating tactical battles where:
 
@@ -66,11 +106,17 @@ This prototype is focused on creating tactical battles where:
 - stamina limits repeated reactions
 - formations naturally emerge from play
 - retreating and advancing both require planning
-- danger zones are readable before committing to a move
+- danger zones are readable before committing
+- battlefield control matters more than raw damage
+- AI behaviors create faction identity
 
-The combat system is inspired by tactical RPGs, but replaces unlimited counterattacks with stamina-based reactions and directional coverage.
+The combat system draws inspiration from tactical RPGs and strategy games, but replaces unlimited counterattacks with stamina-limited directional coverage and reaction systems.
 
-## Controls
+The long-term goal is to create battles that feel readable, positional, and pressure-driven rather than purely statistical.
+
+---
+
+# Controls
 
 | Input | Action |
 |---|---|
@@ -83,33 +129,63 @@ The combat system is inspired by tactical RPGs, but replaces unlimited counterat
 | N | Cancel Action |
 | T | End Turn |
 | C | Toggle Coverage Display |
+| F | Rotate Editor Facing |
+| A | Cycle Editor AI Profile |
 
-## Planned Features
+---
 
-- Enemy AI behaviors and personalities
-- More terrain types
-- Cavalry / breakthrough mechanics
-- Map objectives
-- Morale or pressure systems
-- Faction identity
-- Larger maps with camera controls
+# Planned Features
+
+## AI Expansion
+
+- Chokepoint-holder AI
+- Disciplined AI
+- Formation AI
+- Ranged positioning AI
+- Support/healer AI
+- Objective-defense AI
+
+## Tactical Systems
+
+- Additional terrain types
+- Cavalry and breakthrough mechanics
+- Morale/pressure systems
+- Shieldwall or formation bonuses
+- Unit traits and faction specialties
+- Objective-based combat
+
+## Presentation
+
+- Camera controls
+- Larger maps
+- Combat animations
 - Better UI polish
+- Sound and visual feedback
 - Scenario progression
 
-## Tech
+---
+
+# Tech
 
 - Engine: Godot
 - Language: GDScript
 
-## Repository Goals
+---
+
+# Repository Goals
 
 This repository is being used to:
 
 - learn Git and GitHub workflow
 - prototype tactical combat systems
-- experiment with battlefield design concepts
+- experiment with battlefield-control mechanics
+- explore AI behavior design
 - build a long-term portfolio project
 
-## Current Status
+---
 
-Early prototype / active development. Systems and balance are experimental and subject to change.
+# Current Status
+
+Early prototype / active development.
+
+Systems, balance, AI behavior, and map design are experimental and subject to change as the tactical framework evolves.

@@ -106,11 +106,14 @@ func get_display_stamina(
 # Below 50 = no recovery
 # =========================
 
-func recover_idle_player_healers(units: Array):
+func recover_idle_healers(
+	units: Array,
+	team: String
+):
 
 	for unit in units:
 
-		if unit["team"] != "player":
+		if unit["team"] != team:
 			continue
 
 		if unit["class"] != "healer":

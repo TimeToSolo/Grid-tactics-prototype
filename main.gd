@@ -88,8 +88,8 @@ var hovered_cell: Vector2i = Vector2i(-1, -1)
 # Current cursor-traced movement preview path.
 var hover_path_cells: Array[Vector2i] = []
 
-# Inspect enemy variable
-var inspected_enemy := -1
+# Currently inspected non-active unit ID.
+var inspected_unit_id := -1
 
 # ==================================================
 # LEVEL EDITOR STATE
@@ -867,7 +867,7 @@ func _draw():
 		coverage_mode
 	)
 	
-	draw_inspected_enemy_attack_range()
+	draw_inspected_unit_threat_range()
 
 	render_system.draw_pending_move_tile(
 		self,
@@ -983,27 +983,32 @@ func _draw():
 # from any valid movement tile.
 # =========================
 
-func draw_inspected_enemy_attack_range():
+func draw_inspected_unit_threat_range():
 
-	if inspected_enemy == -1:
+	if inspected_unit_id == -1:
 		return
 
-	if inspected_enemy >= units.size():
-		inspected_enemy = -1
+	var inspected_unit = unit_query.get_unit_index_by_id(
+		units,
+		inspected_unit_id
+	)
+
+	if inspected_unit == -1:
+		inspected_unit_id = -1
 		return
 
-	var enemy = units[inspected_enemy]
+	var inspected = units[inspected_unit]
 
-	var enemy_move_state = selection_system.select_unit(
+	var inspected_move_state = selection_system.select_unit(
 		units,
 		map_data,
 		unit_query,
-		inspected_enemy
+		inspected_unit
 	)
 
-	var enemy_move_tiles = enemy_move_state["move_tiles"]
+	var inspected_move_tiles = inspected_move_state["move_tiles"]
 
-	for tile in enemy_move_tiles:
+	for tile in inspected_move_tiles:
 
 		if not map_data.is_inside_grid(tile):
 			continue
@@ -1015,11 +1020,11 @@ func draw_inspected_enemy_attack_range():
 
 	var threatened_tiles: Array[Vector2i] = []
 
-	for move_tile in enemy_move_tiles:
+	for move_tile in inspected_move_tiles:
 
 		var attack_tiles = unit_logic.get_attack_choice_tiles(
 			move_tile,
-			enemy["class"],
+			inspected["class"],
 			map_data
 		)
 
@@ -1219,7 +1224,7 @@ func handle_keyboard_input(event):
 			cycle_coverage_mode()
 
 		KEY_T:
-			end_player_turn()
+			end_current_turn()
 
 		KEY_W:
 			handle_wait_hotkey()
@@ -1259,10 +1264,12 @@ func cycle_coverage_mode():
 # turn officially advances.
 # =========================
 
-func end_player_turn():
+func end_current_turn():
 
-	if turn_manager.current_team == "player":
-		stamina_system.recover_idle_player_healers(units)
+	stamina_system.recover_idle_healers(
+		units,
+		turn_manager.current_team
+	)
 
 	turn_manager.end_turn(units)
 
@@ -1270,6 +1277,7 @@ func end_player_turn():
 		turn_number += 1
 
 	clear_selection()
+	inspected_unit_id = -1
 
 	queue_redraw()
 
@@ -1376,8 +1384,8 @@ func handle_mouse_input(event):
 			queue_redraw()
 			return
 
-		if inspected_enemy != -1:
-			inspected_enemy = -1
+		if inspected_unit_id != -1:
+			inspected_unit_id = -1
 			queue_redraw()
 			return
 
@@ -1766,27 +1774,21 @@ func used_max_movement() -> bool:
 
 func handle_unit_click(clicked_cell: Vector2i):
 
-	var clicked_unit = unit_query.get_unit_at(
-		units,
-		clicked_cell
-	)
+	var clicked_unit = unit_query.get_unit_at(units, clicked_cell)
 
-	if clicked_unit != -1 and units[clicked_unit]["team"] == "enemy":
+	if clicked_unit != -1 and units[clicked_unit]["team"] != turn_manager.current_team:
 
-		# Clicking same enemy again deselects
-		if inspected_enemy == clicked_unit:
-			inspected_enemy = -1
+		if inspected_unit_id == units[clicked_unit]["id"]:
+			inspected_unit_id = -1
 			queue_redraw()
 			return
 
 		clear_selection()
-
-		inspected_enemy = clicked_unit
-
+		inspected_unit_id = units[clicked_unit]["id"]
 		queue_redraw()
 		return
 
-	inspected_enemy = -1
+	inspected_unit_id = -1
 
 	var result = selection_system.handle_unit_click(
 		units,
@@ -1813,7 +1815,7 @@ func handle_unit_click(clicked_cell: Vector2i):
 
 func select_unit(unit_index: int):
 	
-	inspected_enemy = -1
+	inspected_unit_id = -1
 
 	var state = selection_system.select_unit(
 		units,

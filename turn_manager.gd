@@ -16,8 +16,9 @@ extends Node
 # TURN STATE
 # ==================================================
 
-var current_team = "player"
-
+var team_order = ["player", "enemy"]
+var current_team_index := 0
+var current_team = team_order[current_team_index]
 
 # ==================================================
 # TURN FLOW
@@ -31,12 +32,8 @@ var current_team = "player"
 # =========================
 
 func end_turn(units):
-
-	if current_team == "player":
-		current_team = "enemy"
-	else:
-		current_team = "player"
-
+	current_team_index = (current_team_index + 1) % team_order.size()
+	current_team = team_order[current_team_index]
 	refresh_team_units(units, current_team)
 
 

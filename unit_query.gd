@@ -129,3 +129,27 @@ func selected_unit_is_healer(
 		return false
 
 	return units[selected_unit]["class"] == "healer"
+
+# =========================
+# Returns the current array index
+# of a unit with the given unique ID.
+#
+# Used to safely track units even if
+# array indices change after removals.
+#
+# Returns:
+# - unit index
+# - or -1 if not found
+# =========================
+
+func get_unit_index_by_id(
+	units: Array,
+	unit_id: int
+) -> int:
+
+	for i in range(units.size()):
+
+		if units[i].has("id") and units[i]["id"] == unit_id:
+			return i
+
+	return -1

@@ -7,6 +7,7 @@ extends Node
 # complete unit dictionaries for map placement.
 # ==================================================
 
+var next_unit_id := 1
 
 # ==================================================
 # UNIT CLASS TEMPLATES
@@ -86,10 +87,6 @@ const DEFAULT_MAX_STAMINA = 100
 const DEFAULT_MOVE_STAMINA_COST = 10
 
 
-# ==================================================
-# UNIT CREATION
-# ==================================================
-
 # =========================
 # Creates a complete unit dictionary.
 #
@@ -110,6 +107,7 @@ func create_unit(
 	var template = unit_templates[unit_class]
 
 	var unit = {
+		"id": next_unit_id,
 		"pos": pos,
 		"move": template["move"],
 		"facing": facing,
@@ -147,5 +145,7 @@ func create_unit(
 		unit["charge_recovery_threshold_2"] = (
 			template["charge_recovery_threshold_2"]
 		)
+
+	next_unit_id += 1
 
 	return unit

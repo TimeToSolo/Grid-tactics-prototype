@@ -75,6 +75,8 @@ func remove_unit_at(
 # Places a unit at a cell.
 #
 # Uses UnitData templates.
+# Also assigns the unit's AI profile
+# for automated behavior.
 # =========================
 
 func place_unit(
@@ -85,7 +87,8 @@ func place_unit(
 	cell: Vector2i,
 	unit_class: String,
 	team: String,
-	facing: Vector2i
+	facing: Vector2i,
+	ai_profile: String = "barbarian"
 ):
 
 	if not map_data.is_inside_grid(cell):
@@ -104,7 +107,8 @@ func place_unit(
 		unit_class,
 		team,
 		cell,
-		facing
+		facing,
+		ai_profile
 	)
 
 	units.append(unit)

@@ -101,7 +101,8 @@ func create_unit(
 	unit_class: String,
 	team: String,
 	pos: Vector2i,
-	facing: Vector2i
+	facing: Vector2i,
+	ai_profile: String = "barbarian"
 ) -> Dictionary:
 
 	var template = unit_templates[unit_class]
@@ -114,6 +115,7 @@ func create_unit(
 
 		"class": unit_class,
 		"team": team,
+		"ai_profile": ai_profile,
 
 		"reaction_used": false,
 		"has_acted": false,

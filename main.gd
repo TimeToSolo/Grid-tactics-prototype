@@ -26,6 +26,7 @@ extends Node2D
 
 @onready var action_query = $ActionQuery
 @onready var action_system = $ActionSystem
+@onready var ai_system = $AISystem
 @onready var battle_setup = $BattleSetup
 @onready var combat_logic = $CombatLogic
 @onready var coverage_system = $CoverageSystem
@@ -150,6 +151,41 @@ var editor_map_slot := 1
 
 # Total available quick-save slots.
 const MAX_EDITOR_MAP_SLOTS = 9
+
+# AI profile assigned to newly placed editor units.
+var selected_editor_ai_profile := "barbarian"
+
+var editor_ai_profiles = [
+	"barbarian",
+	"chokepoint_holder",
+	"disciplined",
+	"cautious_ranged",
+	"support",
+	"objective_guard"
+]
+
+# =========================
+# Cycles the AI profile used
+# when placing units in editor mode.
+# =========================
+
+func cycle_editor_ai_profile():
+
+	var current_index = editor_ai_profiles.find(
+		selected_editor_ai_profile
+	)
+
+	if current_index == -1:
+		selected_editor_ai_profile = editor_ai_profiles[0]
+		return
+
+	var next_index = (
+		current_index + 1
+	) % editor_ai_profiles.size()
+
+	selected_editor_ai_profile = editor_ai_profiles[next_index]
+
+	queue_redraw()
 
 # =========================
 # Returns current editor map path.
@@ -506,7 +542,7 @@ func draw_editor_ui():
 
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(x + 170, top_y),
+		Vector2(x + 140, top_y),
 		"Slot " + str(editor_map_slot) + " | Ctrl+S Save | Ctrl+L Load | [ ] Slot",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
@@ -707,12 +743,32 @@ func draw_editor_ui():
 			Color.WHITE
 		)
 
-		var facing_text = "Facing: " + str(selected_editor_facing) + " | [F] Rotate"
+		var facing_text = (
+			"Facing: "
+			+ str(selected_editor_facing)
+			+ " | [F] Rotate"
+		)
 
 		draw_string(
 			ThemeDB.fallback_font,
 			Vector2(x, facing_y),
 			facing_text,
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			font_size,
+			Color.WHITE
+		)
+
+		var ai_text = (
+			"AI: "
+			+ selected_editor_ai_profile
+			+ " | [A] Cycle AI"
+		)
+
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(x + 360, facing_y),
+			ai_text,
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
 			font_size,
@@ -1155,6 +1211,10 @@ func handle_keyboard_input(event):
 
 	match event.keycode:
 
+		KEY_A:
+			if editor_mode:
+				cycle_editor_ai_profile()
+
 		KEY_E:
 			editor_mode = !editor_mode
 
@@ -1280,6 +1340,7 @@ func end_current_turn():
 	inspected_unit_id = -1
 
 	queue_redraw()
+	process_ai_turn_if_needed()
 
 
 # =========================
@@ -1519,7 +1580,8 @@ func handle_left_click():
 				clicked_cell,
 				selected_editor_unit_class,
 				"player",
-				selected_editor_facing
+				selected_editor_facing,
+				selected_editor_ai_profile
 			)
 
 		elif editor_palette == "enemy_unit":
@@ -1532,7 +1594,8 @@ func handle_left_click():
 				clicked_cell,
 				selected_editor_unit_class,
 				"enemy",
-				selected_editor_facing
+				selected_editor_facing,
+				selected_editor_ai_profile
 			)
 
 		queue_redraw()
@@ -2136,3 +2199,42 @@ func get_best_archer_distance_squared_to_tile(
 			best_distance_squared = distance_squared
 
 	return best_distance_squared
+
+# =========================
+# Processes the current team's AI turn
+# if the active team is not player-controlled.
+#
+# After AI actions complete:
+# - advances turn flow
+# - updates turn counter
+# - clears selection/inspection state
+# - refreshes the display
+# =========================
+
+func process_ai_turn_if_needed():
+
+	if turn_manager.current_team == "player":
+		return
+
+	ai_system.take_team_turn(
+		units,
+		turn_manager.current_team,
+		map_data,
+		unit_query,
+		unit_logic,
+		movement_system,
+		action_system,
+		combat_logic,
+		coverage_system,
+		stamina_system
+	)
+
+	turn_manager.end_turn(units)
+
+	if turn_manager.current_team == "player":
+		turn_number += 1
+
+	clear_selection()
+	inspected_unit_id = -1
+
+	queue_redraw()

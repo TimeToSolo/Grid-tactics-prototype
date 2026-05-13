@@ -153,3 +153,28 @@ func get_unit_index_by_id(
 			return i
 
 	return -1
+
+# =========================
+# Returns all occupied tiles except
+# the selected unit's current tile.
+#
+# Used by movement systems that should
+# prevent stacking with any unit,
+# regardless of team.
+# =========================
+
+func get_all_occupied_tiles_except_unit(
+	units: Array,
+	unit_index: int
+) -> Array[Vector2i]:
+
+	var occupied: Array[Vector2i] = []
+
+	for i in range(units.size()):
+
+		if i == unit_index:
+			continue
+
+		occupied.append(units[i]["pos"])
+
+	return occupied

@@ -20,6 +20,7 @@
 [ext_resource type="Script" uid="uid://bth32tvcgqp75" path="res://path_preview_system.gd" id="18_074og"]
 [ext_resource type="Script" uid="uid://nttnhly4fbm2" path="res://editor_system.gd" id="19_cegan"]
 [ext_resource type="Script" uid="uid://dikivmag3p7lf" path="res://map_serializer.gd" id="20_82xsv"]
+[ext_resource type="Script" uid="uid://d2r7naq6y7lrm" path="res://ai_system.gd" id="21_getpj"]
 
 [node name="Main" type="Node2D" unique_id=370152938]
 script = ExtResource("1_ig7tw")
@@ -80,3 +81,6 @@ script = ExtResource("19_cegan")
 
 [node name="MapSerializer" type="Node" parent="." unique_id=1060888428]
 script = ExtResource("20_82xsv")
+
+[node name="AISystem" type="Node" parent="." unique_id=1945847079]
+script = ExtResource("21_getpj")

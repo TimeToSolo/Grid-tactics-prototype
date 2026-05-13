@@ -155,37 +155,105 @@ const MAX_EDITOR_MAP_SLOTS = 9
 # AI profile assigned to newly placed editor units.
 var selected_editor_ai_profile := "barbarian"
 
-var editor_ai_profiles = [
-	"barbarian",
-	"chokepoint_holder",
-	"disciplined",
-	"cautious_ranged",
-	"support",
-	"objective_guard"
-]
+var editor_ai_profiles_by_class = {
+
+	"fighter": [
+		"barbarian",
+		"disciplined",
+		"chokepoint_holder",
+		"objective_guard"
+	],
+
+	"tank": [
+		"barbarian",
+		"disciplined",
+		"chokepoint_holder",
+		"objective_guard"
+	],
+
+	"lancer": [
+		"barbarian",
+		"disciplined",
+		"chokepoint_holder",
+		"objective_guard"
+	],
+
+	"duelist": [
+		"barbarian",
+		"disciplined",
+		"objective_guard"
+	],
+
+	"archer": [
+		"cautious_ranged"
+	],
+
+	"healer": [
+		"support"
+	]
+}
 
 # =========================
 # Cycles the AI profile used
 # when placing units in editor mode.
 # =========================
 
+# =========================
+# Cycles the AI profile used
+# when placing units in editor mode.
+#
+# Only AI profiles valid for the
+# selected unit class are available.
+# =========================
+
 func cycle_editor_ai_profile():
 
-	var current_index = editor_ai_profiles.find(
+	var valid_profiles = get_valid_editor_ai_profiles()
+
+	var current_index = valid_profiles.find(
 		selected_editor_ai_profile
 	)
 
 	if current_index == -1:
-		selected_editor_ai_profile = editor_ai_profiles[0]
+
+		selected_editor_ai_profile = valid_profiles[0]
+		queue_redraw()
 		return
 
 	var next_index = (
 		current_index + 1
-	) % editor_ai_profiles.size()
+	) % valid_profiles.size()
 
-	selected_editor_ai_profile = editor_ai_profiles[next_index]
+	selected_editor_ai_profile = valid_profiles[next_index]
 
 	queue_redraw()
+
+# =========================
+# Returns valid AI profiles for
+# the currently selected unit class.
+# =========================
+
+func get_valid_editor_ai_profiles() -> Array:
+
+	if editor_ai_profiles_by_class.has(selected_editor_unit_class):
+		return editor_ai_profiles_by_class[selected_editor_unit_class]
+
+	return ["barbarian"]
+
+
+# =========================
+# Ensures selected AI profile
+# is valid for the selected class.
+# =========================
+
+func validate_selected_editor_ai_profile():
+
+	var valid_profiles = get_valid_editor_ai_profiles()
+
+	if valid_profiles.has(selected_editor_ai_profile):
+		return
+
+	selected_editor_ai_profile = valid_profiles[0]
 
 # =========================
 # Returns current editor map path.
@@ -1255,30 +1323,42 @@ func handle_keyboard_input(event):
 				selected_editor_tile = "."
 			else:
 				selected_editor_unit_class = "fighter"
+				validate_selected_editor_ai_profile()
+				queue_redraw()
 
 		KEY_2:
 			if editor_palette == "terrain":
 				selected_editor_tile = "W"
 			else:
 				selected_editor_unit_class = "tank"
+				validate_selected_editor_ai_profile()
+				queue_redraw()
 
 		KEY_3:
 			if editor_palette == "terrain":
 				selected_editor_tile = "R"
 			else:
 				selected_editor_unit_class = "lancer"
+				validate_selected_editor_ai_profile()
+				queue_redraw()
 
 		KEY_4:
 			if editor_palette != "terrain":
 				selected_editor_unit_class = "duelist"
+				validate_selected_editor_ai_profile()
+				queue_redraw()
 				
 		KEY_5:
 			if editor_palette != "terrain":
 				selected_editor_unit_class = "healer"
+				validate_selected_editor_ai_profile()
+				queue_redraw()
 
 		KEY_6:
 			if editor_palette != "terrain":
 				selected_editor_unit_class = "archer"
+				validate_selected_editor_ai_profile()
+				queue_redraw()
 
 		KEY_C:
 			cycle_coverage_mode()
@@ -1988,6 +2068,7 @@ func handle_facing_click(clicked_cell: Vector2i):
 	)
 
 	queue_redraw()
+	process_ai_turn_if_needed()
 
 # =========================
 # Confirms pending attack.
@@ -2036,6 +2117,7 @@ func confirm_attack():
 	)
 
 	queue_redraw()
+	process_ai_turn_if_needed()
 
 # =========================
 # Confirms wait action.
@@ -2080,6 +2162,7 @@ func confirm_wait():
 	)
 
 	queue_redraw()
+	process_ai_turn_if_needed()
 
 
 # =========================
@@ -2121,6 +2204,7 @@ func confirm_heal():
 	)
 
 	queue_redraw()
+	process_ai_turn_if_needed()
 
 
 # =========================
@@ -2162,6 +2246,7 @@ func confirm_regen():
 	)
 
 	queue_redraw()
+	process_ai_turn_if_needed()
 
 # ==================================================
 # ARCHER HELPERS
@@ -2220,7 +2305,6 @@ func process_ai_turn_if_needed():
 		units,
 		turn_manager.current_team,
 		map_data,
-		unit_query,
 		unit_logic,
 		movement_system,
 		action_system,

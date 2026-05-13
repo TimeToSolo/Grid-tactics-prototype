@@ -184,7 +184,10 @@ func auto_end_turn_if_needed(
 			return turn_number
 
 	if turn_manager.current_team == "player":
-		stamina_system.recover_idle_player_healers(units)
+		stamina_system.recover_idle_healers(
+			units,
+			turn_manager.current_team
+		)
 
 	turn_manager.end_turn(units)
 

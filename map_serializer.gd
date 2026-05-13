@@ -20,9 +20,15 @@ func save_map(
 
 	for unit in units:
 
+		var ai_profile = "barbarian"
+
+		if unit.has("ai_profile"):
+			ai_profile = unit["ai_profile"]
+
 		save_data["units"].append({
 			"class": unit["class"],
 			"team": unit["team"],
+			"ai_profile": ai_profile,
 			"pos_x": unit["pos"].x,
 			"pos_y": unit["pos"].y,
 			"facing_x": unit["facing"].x,
@@ -41,6 +47,7 @@ func save_map(
 	file.close()
 
 	print("Saved map to: ", file_path)
+
 
 # =========================
 # Loads map state from JSON.
@@ -83,6 +90,11 @@ func load_map(
 
 	for unit_info in data["units"]:
 
+		var ai_profile = "barbarian"
+
+		if unit_info.has("ai_profile"):
+			ai_profile = unit_info["ai_profile"]
+
 		var unit = unit_data.create_unit(
 			unit_info["class"],
 			unit_info["team"],
@@ -93,7 +105,8 @@ func load_map(
 			Vector2i(
 				unit_info["facing_x"],
 				unit_info["facing_y"]
-			)
+			),
+			ai_profile
 		)
 
 		units.append(unit)

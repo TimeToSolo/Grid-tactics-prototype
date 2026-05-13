@@ -136,8 +136,8 @@ func take_unit_turn(
 # Returns expected archer damage
 # after moving a given distance.
 #
-# Archer damage scales with remaining
-# stamina after movement.
+# Archer damage is reduced by a
+# flat penalty per tile moved.
 # =========================
 
 func get_archer_expected_damage_after_move(
@@ -145,23 +145,13 @@ func get_archer_expected_damage_after_move(
 	move_distance: int
 ) -> int:
 
-	var movement_cost = (
-		move_distance
-		* unit["move_stamina_cost"]
-	)
+	var move_damage_penalty = 2
 
-	var remaining_stamina = max(
-		unit["stamina"] - movement_cost,
-		0
-	)
-
-	var stamina_ratio = (
-		float(remaining_stamina)
-		/ float(unit["max_stamina"])
-	)
+	if unit.has("move_damage_penalty"):
+		move_damage_penalty = unit["move_damage_penalty"]
 
 	return max(
-		int(round(unit["attack"] * stamina_ratio)),
+		unit["attack"] - move_distance * move_damage_penalty,
 		1
 	)
 
@@ -410,6 +400,11 @@ func process_cautious_ranged_turn(
 	)
 
 	units[unit_index]["pos"] = destination
+	stamina_system.spend_movement_stamina(
+		units,
+		unit_index,
+		move_distance
+	)
 
 	target_index = get_nearest_enemy(
 		units,
@@ -587,6 +582,11 @@ func process_barbarian_turn(
 	)
 
 	units[unit_index]["pos"] = destination
+	stamina_system.spend_movement_stamina(
+		units,
+		unit_index,
+		move_distance
+	)
 
 	target_index = get_nearest_enemy(
 		units,

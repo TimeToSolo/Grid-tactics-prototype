@@ -35,17 +35,29 @@ func resolve_attack(
 
 	var damage = attacker["attack"]
 
-	# Archer attacks scale with remaining stamina.
+	# Archer attacks lose damage based on
+	# how many tiles worth of stamina were spent moving.
 	if attacker["class"] == "archer":
 
-		var stamina_ratio = (
-			float(attacker["stamina"])
-			/ float(attacker["max_stamina"])
+		var spent_stamina = (
+			attacker["max_stamina"]
+			- attacker["stamina"]
 		)
 
-		damage = int(round(damage * stamina_ratio))
+		var moved_tiles = int(round(
+			float(spent_stamina)
+			/ float(attacker["move_stamina_cost"])
+		))
 
-		damage = max(damage, 1)
+		var move_damage_penalty = 2
+
+		if attacker.has("move_damage_penalty"):
+			move_damage_penalty = attacker["move_damage_penalty"]
+
+		damage = max(
+			attacker["attack"] - moved_tiles * move_damage_penalty,
+			1
+		)
 
 	# Counter/reaction attacks can scale damage separately.
 	damage = int(round(damage * damage_multiplier))

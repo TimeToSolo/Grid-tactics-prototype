@@ -74,7 +74,8 @@ var unit_templates = {
 		"attack": 10,
 		"attack_stamina_cost": 999,
 		"counter_stamina_cost": 999,
-		"counter_damage_multiplier": 0.0
+		"counter_damage_multiplier": 0.0,
+		"move_damage_penalty": 2
 	}
 }
 
@@ -149,5 +150,8 @@ func create_unit(
 		)
 
 	next_unit_id += 1
+
+	if template.has("move_damage_penalty"):
+		unit["move_damage_penalty"] = template["move_damage_penalty"]
 
 	return unit

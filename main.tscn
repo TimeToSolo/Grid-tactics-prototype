@@ -25,62 +25,70 @@
 [node name="Main" type="Node2D" unique_id=370152938]
 script = ExtResource("1_ig7tw")
 
-[node name="MapData" type="Node" parent="." unique_id=95860349]
+[node name="Data" type="Node" parent="." unique_id=1559314220]
+
+[node name="MapData" type="Node" parent="Data" unique_id=95860349]
 script = ExtResource("2_1bvp3")
 
-[node name="UnitLogic" type="Node" parent="." unique_id=13643229]
-script = ExtResource("3_lquwl")
-
-[node name="CombatLogic" type="Node" parent="." unique_id=1573065663]
-script = ExtResource("4_7mycd")
-
-[node name="TurnManager" type="Node" parent="." unique_id=183880828]
-script = ExtResource("5_lquwl")
-
-[node name="UnitData" type="Node" parent="." unique_id=2056336272]
+[node name="UnitData" type="Node" parent="Data" unique_id=2056336272]
 script = ExtResource("6_7mycd")
 
-[node name="BattleSetup" type="Node" parent="." unique_id=26088398]
+[node name="BattleSetup" type="Node" parent="Data" unique_id=26088398]
 script = ExtResource("7_272bh")
 
-[node name="UnitQuery" type="Node" parent="." unique_id=543358470]
-script = ExtResource("8_5vw27")
+[node name="Logic" type="Node" parent="." unique_id=428207965]
 
-[node name="StaminaSystem" type="Node" parent="." unique_id=97320835]
+[node name="UnitLogic" type="Node" parent="Logic" unique_id=13643229]
+script = ExtResource("3_lquwl")
+
+[node name="CombatLogic" type="Node" parent="Logic" unique_id=1573065663]
+script = ExtResource("4_7mycd")
+
+[node name="TurnManager" type="Node" parent="Logic" unique_id=183880828]
+script = ExtResource("5_lquwl")
+
+[node name="StaminaSystem" type="Node" parent="Logic" unique_id=97320835]
 script = ExtResource("9_kek77")
 
-[node name="CoverageSystem" type="Node" parent="." unique_id=938230758]
+[node name="Systems" type="Node" parent="." unique_id=2011317438]
+
+[node name="CoverageSystem" type="Node" parent="Systems" unique_id=938230758]
 script = ExtResource("10_4c57u")
 
-[node name="HoverQuery" type="Node" parent="." unique_id=1251015729]
-script = ExtResource("11_efxa6")
-
-[node name="ActionQuery" type="Node" parent="." unique_id=171700439]
-script = ExtResource("12_dg77c")
-
-[node name="SelectionState" type="Node" parent="." unique_id=348486065]
-script = ExtResource("13_ycdy4")
-
-[node name="RenderSystem" type="Node" parent="." unique_id=782036248]
+[node name="RenderSystem" type="Node" parent="Systems" unique_id=782036248]
 script = ExtResource("14_w48qg")
 
-[node name="ActionSystem" type="Node" parent="." unique_id=514510247]
+[node name="ActionSystem" type="Node" parent="Systems" unique_id=514510247]
 script = ExtResource("15_vivmo")
 
-[node name="MovementSystem" type="Node" parent="." unique_id=1953195263]
+[node name="MovementSystem" type="Node" parent="Systems" unique_id=1953195263]
 script = ExtResource("16_2cqfq")
 
-[node name="SelectionSystem" type="Node" parent="." unique_id=117427443]
+[node name="SelectionSystem" type="Node" parent="Systems" unique_id=117427443]
 script = ExtResource("17_yaehf")
 
-[node name="PathPreviewSystem" type="Node" parent="." unique_id=127527219]
+[node name="PathPreviewSystem" type="Node" parent="Systems" unique_id=127527219]
 script = ExtResource("18_074og")
 
-[node name="EditorSystem" type="Node" parent="." unique_id=1184078650]
+[node name="EditorSystem" type="Node" parent="Systems" unique_id=1184078650]
 script = ExtResource("19_cegan")
 
-[node name="MapSerializer" type="Node" parent="." unique_id=1060888428]
+[node name="MapSerializer" type="Node" parent="Systems" unique_id=1060888428]
 script = ExtResource("20_82xsv")
 
-[node name="AISystem" type="Node" parent="." unique_id=1945847079]
+[node name="AISystem" type="Node" parent="Systems" unique_id=1945847079]
 script = ExtResource("21_getpj")
+
+[node name="SelectionState" type="Node" parent="Systems" unique_id=348486065]
+script = ExtResource("13_ycdy4")
+
+[node name="Queries" type="Node" parent="." unique_id=448626345]
+
+[node name="UnitQuery" type="Node" parent="Queries" unique_id=543358470]
+script = ExtResource("8_5vw27")
+
+[node name="HoverQuery" type="Node" parent="Queries" unique_id=1251015729]
+script = ExtResource("11_efxa6")
+
+[node name="ActionQuery" type="Node" parent="Queries" unique_id=171700439]
+script = ExtResource("12_dg77c")

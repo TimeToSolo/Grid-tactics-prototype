@@ -24,26 +24,29 @@ extends Node2D
 # NODE REFERENCES
 # ==================================================
 
-@onready var action_query = $ActionQuery
-@onready var action_system = $ActionSystem
-@onready var ai_system = $AISystem
-@onready var battle_setup = $BattleSetup
-@onready var combat_logic = $CombatLogic
-@onready var coverage_system = $CoverageSystem
-@onready var editor_system = $EditorSystem
-@onready var hover_query = $HoverQuery
-@onready var map_data = $MapData
-@onready var map_serializer = $MapSerializer
-@onready var movement_system = $MovementSystem
-@onready var path_preview_system = $PathPreviewSystem
-@onready var render_system = $RenderSystem
-@onready var selection_state = $SelectionState
-@onready var selection_system = $SelectionSystem
-@onready var stamina_system = $StaminaSystem
-@onready var turn_manager = $TurnManager
-@onready var unit_data = $UnitData
-@onready var unit_logic = $UnitLogic
-@onready var unit_query = $UnitQuery
+@onready var map_data = $Data/MapData
+@onready var unit_data = $Data/UnitData
+@onready var battle_setup = $Data/BattleSetup
+
+@onready var unit_logic = $Logic/UnitLogic
+@onready var combat_logic = $Logic/CombatLogic
+@onready var turn_manager = $Logic/TurnManager
+@onready var stamina_system = $Logic/StaminaSystem
+
+@onready var action_query = $Queries/ActionQuery
+@onready var hover_query = $Queries/HoverQuery
+@onready var unit_query = $Queries/UnitQuery
+
+@onready var action_system = $Systems/ActionSystem
+@onready var ai_system = $Systems/AISystem
+@onready var coverage_system = $Systems/CoverageSystem
+@onready var editor_system = $Systems/EditorSystem
+@onready var map_serializer = $Systems/MapSerializer
+@onready var movement_system = $Systems/MovementSystem
+@onready var path_preview_system = $Systems/PathPreviewSystem
+@onready var render_system = $Systems/RenderSystem
+@onready var selection_state = $Systems/SelectionState
+@onready var selection_system = $Systems/SelectionSystem
 
 # ==================================================
 # CONSTANTS

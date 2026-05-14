@@ -1,6 +1,6 @@
 extends Node
 
-@onready var unit_query = $"../UnitQuery"
+@onready var unit_query = $"../../Queries/UnitQuery"
 
 # ==================================================
 # AI SYSTEM

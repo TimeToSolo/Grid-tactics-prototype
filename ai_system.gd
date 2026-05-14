@@ -119,6 +119,19 @@ func take_unit_turn(
 				stamina_system
 			)
 
+		"defender":
+			process_defender_turn(
+				units,
+				unit_index,
+				map_data,
+				unit_logic,
+				movement_system,
+				action_system,
+				combat_logic,
+				coverage_system,
+				stamina_system
+			)
+
 		_:
 			process_barbarian_turn(
 				units,
@@ -742,6 +755,63 @@ func get_nearest_enemy(
 	return best_index
 
 # =========================
+# Returns the nearest enemy
+# that is currently inside
+# the defender's leash area.
+#
+# Unlike normal nearest-enemy logic,
+# this ignores enemies outside the
+# defender's assigned territory.
+#
+# Used by defender AI so units:
+# - guard territory
+# - disengage when enemies leave
+# - return home instead of chasing
+#
+# Returns:
+# - enemy unit index
+# - or -1 if no valid enemy exists
+# =========================
+
+func get_nearest_enemy_inside_defender_leash(
+	units: Array,
+	unit_index: int,
+	map_data
+) -> int:
+
+	var unit = units[unit_index]
+
+	var best_index = -1
+	var best_distance = 999999
+
+	for i in range(units.size()):
+
+		if i == unit_index:
+			continue
+
+		if units[i]["team"] == unit["team"]:
+			continue
+
+		# Ignore enemies outside territory
+		if not is_tile_inside_defender_leash(
+			unit,
+			units[i]["pos"],
+			map_data
+		):
+			continue
+
+		var distance = map_data.get_grid_distance(
+			unit["pos"],
+			units[i]["pos"]
+		)
+
+		if distance < best_distance:
+			best_distance = distance
+			best_index = i
+
+	return best_index
+
+# =========================
 # Returns the best reachable tile
 # for moving toward a target.
 #
@@ -872,3 +942,323 @@ func face_target(
 		return
 
 	units[unit_index]["facing"] = allowed_dirs[0]
+
+# =========================
+# Processes one defender AI turn.
+#
+# Defender behavior:
+# - remembers a home position
+# - remembers original facing
+# - stays within leash range of home
+# - attacks enemies already in range
+# - moves only inside its leash area
+# - returns home when no enemies exist
+# - faces original direction when home
+#
+# Design goal:
+# Defender AI should hold territory
+# instead of chasing endlessly.
+# =========================
+
+func process_defender_turn(
+	units: Array,
+	unit_index: int,
+	map_data,
+	unit_logic,
+	_movement_system,
+	_action_system,
+	combat_logic,
+	_coverage_system,
+	stamina_system
+):
+
+	ensure_defender_home_data(
+		units,
+		unit_index
+	)
+
+	var target_index = get_nearest_enemy_inside_defender_leash(
+		units,
+		unit_index,
+		map_data
+	)
+
+	# =========================
+	# No enemy found.
+	# Return to home position.
+	# =========================
+
+	if target_index == -1:
+
+		if units[unit_index]["pos"] != units[unit_index]["home_pos"]:
+
+			var return_tile = get_best_return_home_tile(
+				units,
+				unit_index,
+				map_data
+			)
+
+			var return_distance = map_data.get_grid_distance(
+				units[unit_index]["pos"],
+				return_tile
+			)
+
+			units[unit_index]["pos"] = return_tile
+
+			stamina_system.spend_movement_stamina(
+				units,
+				unit_index,
+				return_distance
+			)
+
+		else:
+
+			if units[unit_index].has("home_facing"):
+				units[unit_index]["facing"] = units[unit_index]["home_facing"]
+
+		units[unit_index]["has_acted"] = true
+		return
+
+	if try_attack_target(
+		units,
+		unit_index,
+		target_index,
+		map_data,
+		unit_logic,
+		combat_logic,
+		stamina_system
+	):
+		return
+
+	var start_pos = units[unit_index]["pos"]
+
+	var destination = get_best_defender_tile(
+		units,
+		unit_index,
+		target_index,
+		map_data,
+		unit_logic
+	)
+
+	var move_direction = Vector2i(
+		sign(destination.x - start_pos.x),
+		sign(destination.y - start_pos.y)
+	)
+
+	var move_distance = map_data.get_grid_distance(
+		start_pos,
+		destination
+	)
+
+	var used_max_movement = (
+		move_distance >= units[unit_index]["move"]
+	)
+
+	units[unit_index]["pos"] = destination
+
+	stamina_system.spend_movement_stamina(
+		units,
+		unit_index,
+		move_distance
+	)
+
+	target_index = get_nearest_enemy_inside_defender_leash(
+		units,
+		unit_index,
+		map_data
+	)
+
+	if target_index != -1:
+
+		if try_attack_target(
+			units,
+			unit_index,
+			target_index,
+			map_data,
+			unit_logic,
+			combat_logic,
+			stamina_system
+		):
+			return
+
+	if target_index != -1:
+
+		face_target(
+			units,
+			unit_index,
+			target_index,
+			unit_logic,
+			move_direction,
+			used_max_movement
+		)
+
+	units[unit_index]["has_acted"] = true
+
+# =========================
+# Finds the best tile for a
+# defender to move toward home.
+#
+# Used when no enemies are found.
+# =========================
+
+func get_best_return_home_tile(
+	units: Array,
+	unit_index: int,
+	map_data
+) -> Vector2i:
+
+	var unit = units[unit_index]
+
+	var occupied_tiles = unit_query.get_all_occupied_tiles_except_unit(
+		units,
+		unit_index
+	)
+
+	var move_tiles = map_data.get_move_range(
+		unit["pos"],
+		unit["move"],
+		occupied_tiles
+	)
+
+	var best_tile = unit["pos"]
+	var best_distance = map_data.get_grid_distance(
+		unit["pos"],
+		unit["home_pos"]
+	)
+
+	for tile in move_tiles:
+
+		var distance = map_data.get_grid_distance(
+			tile,
+			unit["home_pos"]
+		)
+
+		if distance < best_distance:
+			best_distance = distance
+			best_tile = tile
+
+	return best_tile
+
+# =========================
+# Ensures defender units have
+# required home/leash data.
+#
+# If no home position exists,
+# the unit's current position
+# becomes its home position.
+#
+# If no leash range exists,
+# a default value is assigned.
+# =========================
+
+func ensure_defender_home_data(
+	units: Array,
+	unit_index: int
+):
+
+	if not units[unit_index].has("home_pos"):
+		units[unit_index]["home_pos"] = units[unit_index]["pos"]
+
+	if not units[unit_index].has("leash_range"):
+		units[unit_index]["leash_range"] = 3
+
+	if not units[unit_index].has("home_facing"):
+		units[unit_index]["home_facing"] = units[unit_index]["facing"]
+
+
+# =========================
+# Returns true if a tile is
+# inside the defender's leash.
+#
+# The leash is measured from
+# the unit's home position.
+# =========================
+
+func is_tile_inside_defender_leash(
+	unit,
+	tile: Vector2i,
+	map_data
+) -> bool:
+
+	var distance_from_home = map_data.get_grid_distance(
+		unit["home_pos"],
+		tile
+	)
+
+	return distance_from_home <= unit["leash_range"]
+
+
+# =========================
+# Returns the best reachable tile
+# for a defender.
+#
+# Priority:
+# 1. stay inside leash range
+# 2. prefer tiles that can attack target
+# 3. otherwise move closer to target
+# 4. never leave assigned territory
+# =========================
+
+func get_best_defender_tile(
+	units: Array,
+	unit_index: int,
+	target_index: int,
+	map_data,
+	unit_logic
+) -> Vector2i:
+
+	var unit = units[unit_index]
+	var target = units[target_index]
+
+	var move_tiles = map_data.get_move_range(
+		unit["pos"],
+		unit["move"],
+		unit_query.get_all_occupied_tiles_except_unit(
+			units,
+			unit_index
+		)
+	)
+
+	var best_tile = unit["pos"]
+	var best_score = 999999
+
+	for tile in move_tiles:
+
+		if not is_tile_inside_defender_leash(
+			unit,
+			tile,
+			map_data
+		):
+			continue
+
+		var score = 0
+
+		var distance_to_target = map_data.get_grid_distance(
+			tile,
+			target["pos"]
+		)
+
+		score += distance_to_target * 10
+
+		if can_attack_target_from_cell(
+			units,
+			unit_index,
+			target_index,
+			tile,
+			map_data,
+			unit_logic
+		):
+			score -= 100
+
+		var distance_from_home = map_data.get_grid_distance(
+			unit["home_pos"],
+			tile
+		)
+
+		score += distance_from_home
+
+		if score < best_score:
+			best_score = score
+			best_tile = tile
+
+	return best_tile

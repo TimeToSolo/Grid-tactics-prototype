@@ -111,6 +111,11 @@ func place_unit(
 		ai_profile
 	)
 
+	if ai_profile == "defender":
+		unit["home_pos"] = cell
+		unit["home_facing"] = facing
+		unit["leash_range"] = 3
+
 	units.append(unit)
 
 # =========================
@@ -251,4 +256,66 @@ func move_selection(
 	for unit in copied_units:
 
 		unit["pos"] += offset
+
+		if unit.has("home_pos"):
+			unit["home_pos"] += offset
+
 		units.append(unit)
+
+# =========================
+# Increases leash range for
+# a specific unit index.
+#
+# This is a helper function.
+# The main editor node must pass
+# in the units array and selected
+# unit index.
+# =========================
+
+func increase_unit_leash_range(
+	units: Array,
+	unit_index: int
+):
+
+	if unit_index == -1:
+		return
+
+	if unit_index >= units.size():
+		return
+
+	if not units[unit_index].has("leash_range"):
+		units[unit_index]["leash_range"] = 3
+
+	units[unit_index]["leash_range"] += 1
+
+
+# =========================
+# Decreases leash range for
+# a specific unit index.
+#
+# This is a helper function.
+# The main editor node must pass
+# in the units array and selected
+# unit index.
+#
+# Leash range cannot go below 0.
+# =========================
+
+func decrease_unit_leash_range(
+	units: Array,
+	unit_index: int
+):
+
+	if unit_index == -1:
+		return
+
+	if unit_index >= units.size():
+		return
+
+	if not units[unit_index].has("leash_range"):
+		units[unit_index]["leash_range"] = 3
+
+	units[unit_index]["leash_range"] = max(
+		0,
+		units[unit_index]["leash_range"] - 1
+	)

@@ -155,33 +155,33 @@ const MAX_EDITOR_MAP_SLOTS = 9
 # AI profile assigned to newly placed editor units.
 var selected_editor_ai_profile := "barbarian"
 
+var selected_editor_unit := -1
+
+var editor_unit_move_dragging := false
+var editor_unit_move_start_cell: Vector2i = Vector2i(-1, -1)
+
+var show_all_defender_leashes := false
+
 var editor_ai_profiles_by_class = {
 
 	"fighter": [
 		"barbarian",
-		"disciplined",
-		"chokepoint_holder",
-		"objective_guard"
+		"defender"
 	],
 
 	"tank": [
 		"barbarian",
-		"disciplined",
-		"chokepoint_holder",
-		"objective_guard"
+		"defender"
 	],
 
 	"lancer": [
 		"barbarian",
-		"disciplined",
-		"chokepoint_holder",
-		"objective_guard"
+		"defender"
 	],
 
 	"duelist": [
 		"barbarian",
-		"disciplined",
-		"objective_guard"
+		"defender"
 	],
 
 	"archer": [
@@ -797,6 +797,30 @@ func draw_editor_ui():
 			Color.YELLOW
 		)
 
+		if selected_editor_unit != -1 and selected_editor_unit < units.size():
+
+			var unit = units[selected_editor_unit]
+
+			var ai_profile = "none"
+
+			if unit.has("ai_profile"):
+				ai_profile = unit["ai_profile"]
+
+			var leash_text = "N/A"
+
+			if unit.has("leash_range"):
+				leash_text = str(unit["leash_range"])
+
+			draw_string(
+				ThemeDB.fallback_font,
+				Vector2(x, facing_y),
+				"Selected Unit | AI: " + ai_profile + " | Leash: " + leash_text + " | +/- Adjust",
+				HORIZONTAL_ALIGNMENT_LEFT,
+				-1,
+				font_size,
+				Color.CYAN
+			)
+
 	else:
 
 		var action_text = "Left click: place/paint | Right click: remove/erase | Ctrl+drag: rectangle fill"
@@ -1094,9 +1118,163 @@ func _draw():
 	draw_editor_rect_preview()
 	draw_editor_select_drag_preview()
 	draw_editor_selected_area()
+	draw_all_defender_leashes()
+	draw_selected_editor_unit_leash()
+	draw_editor_unit_move_preview()
 	draw_editor_move_preview()
 	draw_editor_ui()
 	draw_editor_resize_ui()
+
+# =========================
+# Draws all defender leash
+# zones while debug overlay
+# is enabled.
+#
+# Used for editor debugging.
+#
+# Purple overlay = defender
+# territory area.
+# =========================
+
+func draw_all_defender_leashes():
+
+	if not editor_mode:
+		return
+
+	if not show_all_defender_leashes:
+		return
+
+	for unit in units:
+
+		if not unit.has("ai_profile"):
+			continue
+
+		if unit["ai_profile"] != "defender":
+			continue
+
+		if not unit.has("home_pos"):
+			continue
+
+		if not unit.has("leash_range"):
+			continue
+
+		var occupied_tiles: Array[Vector2i] = []
+
+		var leash_tiles = map_data.get_move_range(
+			unit["home_pos"],
+			unit["leash_range"],
+			occupied_tiles
+		)
+
+		for tile in leash_tiles:
+
+			if not map_data.is_inside_grid(tile):
+				continue
+
+			draw_rect(
+				map_data.grid_rect(tile),
+				Color(0.6, 0.2, 1.0, 0.12)
+			)
+
+		draw_rect(
+			map_data.grid_rect(unit["home_pos"]),
+			Color(0.6, 0.2, 1.0, 0.35)
+		)
+
+# =========================
+# Draws destination preview
+# while dragging a selected
+# editor unit.
+#
+# Yellow overlay = unit's
+# pending destination tile.
+# =========================
+
+func draw_editor_unit_move_preview():
+
+	if not editor_mode:
+		return
+
+	if editor_palette != "select":
+		return
+
+	if not editor_unit_move_dragging:
+		return
+
+	if selected_editor_unit == -1:
+		return
+
+	if selected_editor_unit >= units.size():
+		return
+
+	var offset = hovered_cell - editor_unit_move_start_cell
+
+	if offset == Vector2i.ZERO:
+		return
+
+	var target_cell = units[selected_editor_unit]["pos"] + offset
+
+	if not map_data.is_inside_grid(target_cell):
+		return
+
+	draw_rect(
+		map_data.grid_rect(target_cell),
+		Color(1.0, 1.0, 0.0, 0.45)
+	)
+
+# =========================
+# Draws leash range preview
+# for the currently selected
+# editor unit.
+#
+# Blue overlay = allowed
+# defender movement area.
+# =========================
+
+func draw_selected_editor_unit_leash():
+
+	if not editor_mode:
+		return
+
+	if editor_palette != "select":
+		return
+
+	if selected_editor_unit == -1:
+		return
+
+	if selected_editor_unit >= units.size():
+		return
+
+	var unit = units[selected_editor_unit]
+
+	if not unit.has("home_pos"):
+		return
+
+	if not unit.has("leash_range"):
+		return
+
+	var occupied_tiles: Array[Vector2i] = []
+
+	var leash_tiles = map_data.get_move_range(
+		unit["home_pos"],
+		unit["leash_range"],
+		occupied_tiles
+	)
+
+	for tile in leash_tiles:
+
+		if not map_data.is_inside_grid(tile):
+			continue
+
+		draw_rect(
+			map_data.grid_rect(tile),
+			Color(0.2, 0.5, 1.0, 0.22)
+		)
+
+	draw_rect(
+		map_data.grid_rect(unit["home_pos"]),
+		Color(0.0, 0.8, 1.0, 0.45)
+	)
 
 # =========================
 # Draws the inspected enemy's
@@ -1289,14 +1467,14 @@ func handle_keyboard_input(event):
 			clear_pending_action_state()
 
 			queue_redraw()
-			
+
 		KEY_F:
 			if editor_mode:
 				rotate_editor_facing()
-				
+
 		KEY_M:
 			start_editor_resize_mode()
-			
+
 		KEY_S:
 
 			if editor_mode and event.ctrl_pressed:
@@ -1309,7 +1487,7 @@ func handle_keyboard_input(event):
 
 		KEY_TAB:
 			cycle_editor_palette()
-			
+
 		KEY_BRACKETLEFT:
 			if editor_mode:
 				change_editor_map_slot(-1)
@@ -1317,6 +1495,34 @@ func handle_keyboard_input(event):
 		KEY_BRACKETRIGHT:
 			if editor_mode:
 				change_editor_map_slot(1)
+
+		KEY_EQUAL:
+
+			if (
+				editor_mode
+				and editor_palette == "select"
+			):
+
+				editor_system.increase_unit_leash_range(
+					units,
+					selected_editor_unit
+				)
+
+				queue_redraw()
+
+		KEY_MINUS:
+
+			if (
+				editor_mode
+				and editor_palette == "select"
+			):
+
+				editor_system.decrease_unit_leash_range(
+					units,
+					selected_editor_unit
+				)
+
+				queue_redraw()
 
 		KEY_1:
 			if editor_palette == "terrain":
@@ -1347,7 +1553,7 @@ func handle_keyboard_input(event):
 				selected_editor_unit_class = "duelist"
 				validate_selected_editor_ai_profile()
 				queue_redraw()
-				
+
 		KEY_5:
 			if editor_palette != "terrain":
 				selected_editor_unit_class = "healer"
@@ -1380,6 +1586,11 @@ func handle_keyboard_input(event):
 
 		KEY_N:
 			cancel_pending_action()
+
+		KEY_F7:
+			if editor_mode:
+				show_all_defender_leashes = !show_all_defender_leashes
+				queue_redraw()
 
 
 # =========================
@@ -1497,6 +1708,8 @@ func handle_mouse_input(event):
 
 			if editor_palette == "select":
 
+				selected_editor_unit = -1
+
 				editor_selected_rect_start = Vector2i(-1, -1)
 				editor_selected_rect_end = Vector2i(-1, -1)
 
@@ -1547,6 +1760,26 @@ func handle_mouse_input(event):
 
 				if editor_palette == "select":
 
+					var clicked_unit = unit_query.get_unit_at(
+						units,
+						hovered_cell
+					)
+
+					if clicked_unit != -1:
+
+						selected_editor_unit = clicked_unit
+
+						editor_selected_rect_start = Vector2i(-1, -1)
+						editor_selected_rect_end = Vector2i(-1, -1)
+
+						editor_unit_move_dragging = true
+						editor_unit_move_start_cell = hovered_cell
+
+						queue_redraw()
+						return
+
+					selected_editor_unit = -1
+
 					if editor_cell_is_inside_selected_area(hovered_cell):
 
 						editor_move_dragging = true
@@ -1566,6 +1799,44 @@ func handle_mouse_input(event):
 					return
 
 				handle_left_click()
+				return
+
+			if not event.pressed and editor_unit_move_dragging:
+
+				var offset = hovered_cell - editor_unit_move_start_cell
+
+				if (
+					selected_editor_unit != -1
+					and selected_editor_unit < units.size()
+					and offset != Vector2i.ZERO
+				):
+
+					var target_cell = units[selected_editor_unit]["pos"] + offset
+
+					if (
+						map_data.is_inside_grid(target_cell)
+						and not map_data.blocks_movement(target_cell)
+					):
+
+						var occupied_unit = unit_query.get_unit_at(
+							units,
+							target_cell
+						)
+
+						if (
+							occupied_unit == -1
+							or occupied_unit == selected_editor_unit
+						):
+
+							units[selected_editor_unit]["pos"] = target_cell
+
+							if units[selected_editor_unit].has("home_pos"):
+								units[selected_editor_unit]["home_pos"] += offset
+
+				editor_unit_move_dragging = false
+				editor_unit_move_start_cell = Vector2i(-1, -1)
+
+				queue_redraw()
 				return
 
 			if not event.pressed and editor_move_dragging:

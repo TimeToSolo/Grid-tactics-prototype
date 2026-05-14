@@ -2,9 +2,9 @@
 
 Turn-based tactical combat prototype built in Godot using GDScript.
 
-This project explores tactical combat centered around movement, facing, stamina, directional coverage, and battlefield pressure. The goal is to create battles where positioning matters before attacks happen, defensive lines can hold or collapse, and movement itself creates tactical vulnerability.
+This project explores tactical combat centered around movement, facing, stamina, directional coverage, territorial control, and battlefield pressure. The goal is to create battles where positioning matters before attacks happen, defensive lines can hold or collapse, and movement itself creates tactical vulnerability.
 
-Rather than focusing on raw stat trading, the prototype emphasizes formation integrity, controlled advances, retreat pressure, lane denial, and readable battlefield threat.
+Rather than focusing on raw stat trading, the prototype emphasizes formation integrity, controlled advances, retreat pressure, lane denial, territorial defense, and readable battlefield threat.
 
 ---
 
@@ -51,15 +51,19 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 - Regeneration support
 - Directional interception
 - Formation pressure
-- Choke point gameplay
+- Chokepoint gameplay
 - Fallback-line gameplay
 - Coverage-based positional control
+- Territorial AI leash systems
+- Home-position defensive behavior
 
 ## AI Systems
 
 - Modular AI profile architecture
 - Per-unit AI behavior assignment
 - Mixed AI behaviors supported within the same faction
+- Territory-aware defensive AI
+- Data-driven AI profile system
 
 ### Current AI Profiles
 
@@ -69,6 +73,15 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 - Attacks whenever possible
 - Ignores coverage danger
 - Respects movement/facing restrictions
+
+#### Defender
+
+- Guards a persistent home position
+- Operates inside a configurable leash radius
+- Attacks enemies inside assigned territory
+- Returns home when enemies leave territory
+- Restores original facing direction while idle
+- Never chases endlessly across the map
 
 ## Editor Features
 
@@ -81,6 +94,13 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 - Facing assignment
 - AI profile assignment
 - Editor UI overlays
+- Unit selection mode
+- Defender leash editing
+- Home tile visualization
+- Selected-unit drag movement
+- Area drag movement
+- Live leash-range previews
+- Global defender territory debug overlay (`F7`)
 
 ## UI Features
 
@@ -94,6 +114,8 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 - Stamina display
 - Confirmation prompts
 - Threat range inspection for enemy units
+- Defender territory overlays
+- Live movement destination previews
 
 ---
 
@@ -109,10 +131,12 @@ This prototype is focused on creating tactical battles where:
 - danger zones are readable before committing
 - battlefield control matters more than raw damage
 - AI behaviors create faction identity
+- territory ownership influences combat flow
+- positioning matters before attacks happen
 
 The combat system draws inspiration from tactical RPGs and strategy games, but replaces unlimited counterattacks with stamina-limited directional coverage and reaction systems.
 
-The long-term goal is to create battles that feel readable, positional, and pressure-driven rather than purely statistical.
+The long-term goal is to create battles that feel readable, positional, pressure-driven, and tactically expressive rather than purely statistical.
 
 ---
 
@@ -131,6 +155,10 @@ The long-term goal is to create battles that feel readable, positional, and pres
 | C | Toggle Coverage Display |
 | F | Rotate Editor Facing |
 | A | Cycle Editor AI Profile |
+| TAB | Cycle Editor Palette |
+| M | Resize Map |
+| F7 | Toggle Defender Territory Overlay |
+| +/- | Adjust Selected Defender Leash |
 
 ---
 
@@ -138,12 +166,16 @@ The long-term goal is to create battles that feel readable, positional, and pres
 
 ## AI Expansion
 
-- Chokepoint-holder AI
 - Disciplined AI
 - Formation AI
-- Ranged positioning AI
+- Patrol AI
+- Escort AI
+- Advanced ranged positioning AI
 - Support/healer AI
 - Objective-defense AI
+- Multi-layer territory ownership
+- Reinforcement behaviors
+- AI coordination systems
 
 ## Tactical Systems
 
@@ -153,6 +185,9 @@ The long-term goal is to create battles that feel readable, positional, and pres
 - Shieldwall or formation bonuses
 - Unit traits and faction specialties
 - Objective-based combat
+- Ambush and stealth systems
+- Patrol routes
+- Dynamic defensive lines
 
 ## Presentation
 
@@ -162,6 +197,7 @@ The long-term goal is to create battles that feel readable, positional, and pres
 - Better UI polish
 - Sound and visual feedback
 - Scenario progression
+- Environmental effects
 
 ---
 
@@ -181,6 +217,8 @@ This repository is being used to:
 - experiment with battlefield-control mechanics
 - explore AI behavior design
 - build a long-term portfolio project
+- develop scalable tactical architecture
+- explore territory-based AI systems
 
 ---
 
@@ -188,4 +226,11 @@ This repository is being used to:
 
 Early prototype / active development.
 
-Systems, balance, AI behavior, and map design are experimental and subject to change as the tactical framework evolves.
+Systems, balance, AI behavior, editor tooling, and map design are experimental and subject to change as the tactical framework evolves.
+
+Recent development has focused heavily on:
+- modular AI architecture
+- territory-aware defender behavior
+- editor workflow improvements
+- scalable tactical systems
+- debugging and visualization tools

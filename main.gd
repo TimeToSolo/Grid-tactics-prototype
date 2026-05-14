@@ -24,18 +24,37 @@ extends Node2D
 # NODE REFERENCES
 # ==================================================
 
+# =========================
+# DATA
+# =========================
+
+@onready var battle_setup = $Data/BattleSetup
 @onready var map_data = $Data/MapData
 @onready var unit_data = $Data/UnitData
-@onready var battle_setup = $Data/BattleSetup
 
-@onready var unit_logic = $Logic/UnitLogic
+
+# =========================
+# LOGIC
+# =========================
+
 @onready var combat_logic = $Logic/CombatLogic
-@onready var turn_manager = $Logic/TurnManager
 @onready var stamina_system = $Logic/StaminaSystem
+@onready var turn_manager = $Logic/TurnManager
+@onready var unit_logic = $Logic/UnitLogic
+
+
+# =========================
+# QUERIES
+# =========================
 
 @onready var action_query = $Queries/ActionQuery
 @onready var hover_query = $Queries/HoverQuery
 @onready var unit_query = $Queries/UnitQuery
+
+
+# =========================
+# SYSTEMS
+# =========================
 
 @onready var action_system = $Systems/ActionSystem
 @onready var ai_system = $Systems/AISystem
@@ -192,7 +211,7 @@ var editor_ai_profiles_by_class = {
 	],
 
 	"healer": [
-		"support"
+		"support_healer"
 	]
 }
 
@@ -2585,6 +2604,11 @@ func process_ai_turn_if_needed():
 		combat_logic,
 		coverage_system,
 		stamina_system
+	)
+
+	stamina_system.recover_idle_healers(
+		units,
+		turn_manager.current_team
 	)
 
 	turn_manager.end_turn(units)

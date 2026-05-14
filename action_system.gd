@@ -251,7 +251,7 @@ func confirm_heal(
 
 	combat_logic.apply_heal(
 		units[pending_heal_target],
-		15
+		units[selected_unit]["heal_amount"]
 	)
 
 	units[selected_unit]["heal_charges"] -= 1
@@ -327,8 +327,8 @@ func confirm_regen(
 
 	combat_logic.apply_regen(
 		units[pending_heal_target],
-		5,
-		4
+		units[selected_unit]["regen_amount"],
+		units[selected_unit]["regen_turns"]
 	)
 
 	units[selected_unit]["heal_charges"] -= 1

@@ -132,6 +132,19 @@ func take_unit_turn(
 				stamina_system
 			)
 
+		"support_healer":
+			process_support_healer_turn(
+				units,
+				unit_index,
+				map_data,
+				unit_logic,
+				movement_system,
+				action_system,
+				combat_logic,
+				coverage_system,
+				stamina_system
+			)
+
 		_:
 			process_barbarian_turn(
 				units,
@@ -1256,6 +1269,358 @@ func get_best_defender_tile(
 		)
 
 		score += distance_from_home
+
+		if score < best_score:
+			best_score = score
+			best_tile = tile
+
+	return best_tile
+
+# =========================
+# Processes one support healer AI turn.
+#
+# Support healer behavior:
+# - heals the most wounded nearby ally
+# - moves toward wounded allies if needed
+# - attacks only if no healing is useful
+# - waits if nothing useful can be done
+# =========================
+
+func process_support_healer_turn(
+	units: Array,
+	unit_index: int,
+	map_data,
+	unit_logic,
+	_movement_system,
+	_action_system,
+	combat_logic,
+	_coverage_system,
+	stamina_system
+):
+
+	var heal_target_index = get_best_heal_target(
+		units,
+		unit_index,
+		map_data
+	)
+
+	if heal_target_index != -1:
+
+		if try_heal_target(
+			units,
+			unit_index,
+			heal_target_index,
+			map_data,
+			unit_logic,
+			combat_logic,
+			stamina_system
+		):
+			return
+
+		var start_pos = units[unit_index]["pos"]
+
+		var destination = get_best_healer_approach_tile(
+			units,
+			unit_index,
+			heal_target_index,
+			map_data,
+			unit_logic
+		)
+
+		var move_distance = map_data.get_grid_distance(
+			start_pos,
+			destination
+		)
+
+		units[unit_index]["pos"] = destination
+
+		stamina_system.spend_movement_stamina(
+			units,
+			unit_index,
+			move_distance
+		)
+
+		heal_target_index = get_best_heal_target(
+			units,
+			unit_index,
+			map_data
+		)
+
+		if heal_target_index != -1:
+
+			if try_heal_target(
+				units,
+				unit_index,
+				heal_target_index,
+				map_data,
+				unit_logic,
+				combat_logic,
+				stamina_system
+			):
+				return
+
+		units[unit_index]["has_acted"] = true
+		return
+
+	# No useful healing available.
+	# Fall back to adjacent attack if possible.
+
+	var enemy_index = get_nearest_enemy(
+		units,
+		unit_index,
+		map_data
+	)
+
+	if enemy_index != -1:
+
+		if try_attack_target(
+			units,
+			unit_index,
+			enemy_index,
+			map_data,
+			unit_logic,
+			combat_logic,
+			stamina_system
+		):
+			return
+
+	units[unit_index]["has_acted"] = true
+
+
+# =========================
+# Returns the best wounded ally
+# for a healer to prioritize.
+#
+# Priority:
+# 1. lowest HP percentage
+# 2. largest missing HP
+# 3. closest distance
+# =========================
+
+func get_best_heal_target(
+	units: Array,
+	healer_index: int,
+	map_data
+) -> int:
+
+	var healer = units[healer_index]
+
+	if healer.has("heal_charges"):
+		if healer["heal_charges"] <= 0:
+			return -1
+
+	var best_index = -1
+	var best_score = 999999
+
+	for i in range(units.size()):
+
+		if i == healer_index:
+			continue
+
+		if units[i]["team"] != healer["team"]:
+			continue
+
+		if not units[i].has("max_hp"):
+			continue
+
+		if units[i]["hp"] >= units[i]["max_hp"]:
+			continue
+
+		var missing_hp = units[i]["max_hp"] - units[i]["hp"]
+
+		var hp_percent_score = int(
+			float(units[i]["hp"]) / float(units[i]["max_hp"]) * 100.0
+		)
+
+		var distance = map_data.get_grid_distance(
+			healer["pos"],
+			units[i]["pos"]
+		)
+
+		var score = 0
+		score += hp_percent_score * 10
+		score -= missing_hp * 2
+		score += distance
+
+		if score < best_score:
+			best_score = score
+			best_index = i
+
+	return best_index
+
+
+# =========================
+# Attempts to heal a target ally.
+#
+# Returns:
+# - true if healing was performed
+# - false if target is not adjacent
+# =========================
+
+func try_heal_target(
+	units: Array,
+	healer_index: int,
+	target_index: int,
+	map_data,
+	unit_logic,
+	combat_logic,
+	stamina_system
+) -> bool:
+
+	if healer_index == -1:
+		return false
+
+	if target_index == -1:
+		return false
+
+	if healer_index >= units.size():
+		return false
+
+	if target_index >= units.size():
+		return false
+
+	var healer = units[healer_index]
+	var target = units[target_index]
+
+	if healer.has("heal_charges"):
+		if healer["heal_charges"] <= 0:
+			return false
+
+	if target["hp"] >= target["max_hp"]:
+		return false
+
+	var heal_tiles = unit_logic.get_adjacent_choice_tiles(
+		healer["pos"],
+		map_data
+	)
+
+	if not heal_tiles.has(target["pos"]):
+		return false
+
+	var heal_direction = target["pos"] - healer["pos"]
+
+	healer["facing"] = Vector2i(
+		sign(heal_direction.x),
+		sign(heal_direction.y)
+	)
+
+	combat_logic.apply_heal(
+		target,
+		healer["heal_amount"]
+	)
+
+	if healer.has("heal_charges"):
+		healer["heal_charges"] -= 1
+
+	healer["stamina"] = max(
+		healer["stamina"] - healer["heal_stamina_cost"],
+		0
+	)
+
+	healer["has_acted"] = true
+
+	return true
+
+
+# =========================
+# Returns true if a healer can heal
+# a target ally from a test cell.
+# =========================
+
+func can_heal_target_from_cell(
+	units: Array,
+	healer_index: int,
+	target_index: int,
+	test_cell: Vector2i,
+	map_data,
+	unit_logic
+) -> bool:
+
+	if healer_index == -1:
+		return false
+
+	if target_index == -1:
+		return false
+
+	if healer_index >= units.size():
+		return false
+
+	if target_index >= units.size():
+		return false
+
+	var target = units[target_index]
+
+	if target["hp"] >= target["max_hp"]:
+		return false
+
+	var heal_tiles = unit_logic.get_adjacent_choice_tiles(
+		test_cell,
+		map_data
+	)
+
+	return heal_tiles.has(target["pos"])
+
+
+# =========================
+# Returns the best reachable tile
+# for moving toward a wounded ally.
+#
+# Priority:
+# 1. move to a tile that can heal
+# 2. use the shortest movement needed
+# 3. otherwise move closer
+# =========================
+
+func get_best_healer_approach_tile(
+	units: Array,
+	healer_index: int,
+	target_index: int,
+	map_data,
+	unit_logic
+) -> Vector2i:
+
+	var healer = units[healer_index]
+	var target = units[target_index]
+
+	var move_tiles = map_data.get_move_range(
+		healer["pos"],
+		healer["move"],
+		unit_query.get_all_occupied_tiles_except_unit(
+			units,
+			healer_index
+		)
+	)
+
+	var best_tile = healer["pos"]
+	var best_score = 999999
+
+	for tile in move_tiles:
+
+		var score = 0
+
+		var distance_to_target = map_data.get_grid_distance(
+			tile,
+			target["pos"]
+		)
+
+		score += distance_to_target * 10
+
+		if can_heal_target_from_cell(
+			units,
+			healer_index,
+			target_index,
+			tile,
+			map_data,
+			unit_logic
+		):
+			score -= 1000
+
+		var move_distance = map_data.get_grid_distance(
+			healer["pos"],
+			tile
+		)
+
+		score += move_distance
 
 		if score < best_score:
 			best_score = score

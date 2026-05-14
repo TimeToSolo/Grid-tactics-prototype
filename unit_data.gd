@@ -58,6 +58,10 @@ var unit_templates = {
 		"counter_stamina_cost": 999,
 		"counter_damage_multiplier": 0.0,
 
+		"heal_amount": 15,
+		"regen_amount": 5,
+		"regen_turns": 4,
+
 		"heal_stamina_cost": 60,
 		"regen_stamina_cost": 60,
 
@@ -137,6 +141,10 @@ func create_unit(
 
 		unit["heal_charges"] = template["heal_charges"]
 		unit["max_heal_charges"] = template["max_heal_charges"]
+
+		unit["heal_amount"] = template["heal_amount"]
+		unit["regen_amount"] = template["regen_amount"]
+		unit["regen_turns"] = template["regen_turns"]
 
 		unit["heal_stamina_cost"] = template["heal_stamina_cost"]
 		unit["regen_stamina_cost"] = template["regen_stamina_cost"]

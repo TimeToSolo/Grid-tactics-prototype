@@ -20,7 +20,17 @@ var unit_templates = {
 		"attack": 9,
 		"attack_stamina_cost": 45,
 		"counter_stamina_cost": 35,
-		"counter_damage_multiplier": 0.8
+		"counter_damage_multiplier": 0.8,
+		"move_damage_penalty": 0,
+		"heal_amount": 0,
+		"regen_amount": 0,
+		"regen_turns": 0,
+		"heal_stamina_cost": 0,
+		"regen_stamina_cost": 0,
+		"heal_charges": 0,
+		"max_heal_charges": 0,
+		"charge_recovery_threshold_1": 0,
+		"charge_recovery_threshold_2": 0
 	},
 
 	"tank": {
@@ -29,7 +39,17 @@ var unit_templates = {
 		"attack": 8,
 		"attack_stamina_cost": 50,
 		"counter_stamina_cost": 25,
-		"counter_damage_multiplier": 0.5
+		"counter_damage_multiplier": 0.5,
+		"move_damage_penalty": 0,
+		"heal_amount": 0,
+		"regen_amount": 0,
+		"regen_turns": 0,
+		"heal_stamina_cost": 0,
+		"regen_stamina_cost": 0,
+		"heal_charges": 0,
+		"max_heal_charges": 0,
+		"charge_recovery_threshold_1": 0,
+		"charge_recovery_threshold_2": 0
 	},
 
 	"lancer": {
@@ -38,7 +58,17 @@ var unit_templates = {
 		"attack": 10,
 		"attack_stamina_cost": 40,
 		"counter_stamina_cost": 30,
-		"counter_damage_multiplier": 0.8
+		"counter_damage_multiplier": 0.8,
+		"move_damage_penalty": 0,
+		"heal_amount": 0,
+		"regen_amount": 0,
+		"regen_turns": 0,
+		"heal_stamina_cost": 0,
+		"regen_stamina_cost": 0,
+		"heal_charges": 0,
+		"max_heal_charges": 0,
+		"charge_recovery_threshold_1": 0,
+		"charge_recovery_threshold_2": 0
 	},
 
 	"duelist": {
@@ -47,7 +77,17 @@ var unit_templates = {
 		"attack": 11,
 		"attack_stamina_cost": 30,
 		"counter_stamina_cost": 30,
-		"counter_damage_multiplier": 1.0
+		"counter_damage_multiplier": 1.0,
+		"move_damage_penalty": 0,
+		"heal_amount": 0,
+		"regen_amount": 0,
+		"regen_turns": 0,
+		"heal_stamina_cost": 0,
+		"regen_stamina_cost": 0,
+		"heal_charges": 0,
+		"max_heal_charges": 0,
+		"charge_recovery_threshold_1": 0,
+		"charge_recovery_threshold_2": 0
 	},
 
 	"healer": {
@@ -57,17 +97,14 @@ var unit_templates = {
 		"attack_stamina_cost": 20,
 		"counter_stamina_cost": 999,
 		"counter_damage_multiplier": 0.0,
-
+		"move_damage_penalty": 0,
 		"heal_amount": 15,
 		"regen_amount": 5,
 		"regen_turns": 4,
-
 		"heal_stamina_cost": 60,
 		"regen_stamina_cost": 60,
-
 		"charge_recovery_threshold_1": 50,
 		"charge_recovery_threshold_2": 90,
-
 		"heal_charges": 3,
 		"max_heal_charges": 3
 	},
@@ -79,7 +116,16 @@ var unit_templates = {
 		"attack_stamina_cost": 999,
 		"counter_stamina_cost": 999,
 		"counter_damage_multiplier": 0.0,
-		"move_damage_penalty": 2
+		"move_damage_penalty": 2,
+		"heal_amount": 0,
+		"regen_amount": 0,
+		"regen_turns": 0,
+		"heal_stamina_cost": 0,
+		"regen_stamina_cost": 0,
+		"heal_charges": 0,
+		"max_heal_charges": 0,
+		"charge_recovery_threshold_1": 0,
+		"charge_recovery_threshold_2": 0
 	}
 }
 
@@ -118,6 +164,10 @@ func create_unit(
 		"move": template["move"],
 		"facing": facing,
 
+		"home_pos": pos,
+		"home_facing": facing,
+		"leash_range": 0,
+
 		"class": unit_class,
 		"team": team,
 		"ai_profile": ai_profile,
@@ -128,38 +178,26 @@ func create_unit(
 		"hp": template["hp"],
 		"max_hp": template["hp"],
 		"attack": template["attack"],
+		"move_damage_penalty": template["move_damage_penalty"],
 
 		"max_stamina": DEFAULT_MAX_STAMINA,
 		"stamina": DEFAULT_MAX_STAMINA,
 		"move_stamina_cost": DEFAULT_MOVE_STAMINA_COST,
 		"attack_stamina_cost": template["attack_stamina_cost"],
 		"counter_stamina_cost": template["counter_stamina_cost"],
-		"counter_damage_multiplier": template["counter_damage_multiplier"]
+		"counter_damage_multiplier": template["counter_damage_multiplier"],
+		
+		"heal_charges": template["heal_charges"],
+		"max_heal_charges": template["max_heal_charges"],
+		"heal_amount": template["heal_amount"],
+		"regen_amount": template["regen_amount"],
+		"regen_turns": template["regen_turns"],
+		"heal_stamina_cost": template["heal_stamina_cost"],
+		"regen_stamina_cost": template["regen_stamina_cost"],
+		"charge_recovery_threshold_1": template["charge_recovery_threshold_1"],
+		"charge_recovery_threshold_2": template["charge_recovery_threshold_2"]
 	}
 
-	if unit_class == "healer":
-
-		unit["heal_charges"] = template["heal_charges"]
-		unit["max_heal_charges"] = template["max_heal_charges"]
-
-		unit["heal_amount"] = template["heal_amount"]
-		unit["regen_amount"] = template["regen_amount"]
-		unit["regen_turns"] = template["regen_turns"]
-
-		unit["heal_stamina_cost"] = template["heal_stamina_cost"]
-		unit["regen_stamina_cost"] = template["regen_stamina_cost"]
-
-		unit["charge_recovery_threshold_1"] = (
-			template["charge_recovery_threshold_1"]
-		)
-
-		unit["charge_recovery_threshold_2"] = (
-			template["charge_recovery_threshold_2"]
-		)
-
 	next_unit_id += 1
-
-	if template.has("move_damage_penalty"):
-		unit["move_damage_penalty"] = template["move_damage_penalty"]
 
 	return unit

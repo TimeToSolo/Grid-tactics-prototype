@@ -39,12 +39,7 @@ func draw_grid(
 # =========================
 # Draws reachable movement tiles.
 #
-# Cyan:
-# - normal movement
-#
-# Darker blue:
-# - max-range movement
-# - limited pivot/facing
+# Cyan tiles show valid movement.
 # =========================
 
 func draw_move_tiles(
@@ -52,35 +47,18 @@ func draw_move_tiles(
 	map_data,
 	units: Array,
 	selected_unit: int,
-	selected_unit_start_cell: Vector2i,
 	move_tiles: Array[Vector2i]
 ):
-
 	if selected_unit == -1:
 		return
 
-	var start = selected_unit_start_cell
-	var max_move = units[selected_unit]["move"]
-
 	for cell in move_tiles:
-
 		var rect = map_data.grid_rect(cell)
-
-		if map_data.is_max_range_tile(start, cell, max_move):
-
-			canvas.draw_rect(
-				rect,
-				Color(0.0, 0.65, 0.85, 0.60),
-				true
-			)
-
-		else:
-
-			canvas.draw_rect(
-				rect,
-				Color(0.0, 0.8, 1.0, 0.45),
-				true
-			)
+		canvas.draw_rect(
+			rect,
+			Color(0.0, 0.8, 1.0, 0.45),
+			true
+		)
 
 
 # =========================
@@ -102,6 +80,7 @@ func draw_pending_move_tile(
 		Color(1.0, 1.0, 0.0, 0.65),
 		true
 	)
+
 # ==================================================
 # ATTACK RANGE DRAWING
 # ==================================================
@@ -331,8 +310,6 @@ func draw_coverage_preview(
 	units: Array,
 	selected_unit: int,
 	pending_move_cell: Vector2i,
-	pending_move_distance: int,
-	pending_move_direction: Vector2i,
 	hovered_cell: Vector2i,
 	has_pending_move: bool,
 	valid_lancer_tiles: Array[Vector2i]
@@ -373,9 +350,6 @@ func draw_coverage_preview(
 
 		var facing_tiles = unit_logic.get_facing_choice_tiles(
 			pending_move_cell,
-			pending_move_distance,
-			pending_move_direction,
-			units[selected_unit]["move"],
 			map_data
 		)
 
@@ -434,8 +408,6 @@ func draw_facing_choice_tiles(
 	selected_unit: int,
 	move_tiles: Array[Vector2i],
 	pending_move_cell: Vector2i,
-	pending_move_distance: int,
-	pending_move_direction: Vector2i,
 	has_pending_move: bool,
 	valid_lancer_tiles: Array[Vector2i]
 ):
@@ -468,9 +440,6 @@ func draw_facing_choice_tiles(
 
 	var facing_tiles = unit_logic.get_facing_choice_tiles(
 		pending_move_cell,
-		pending_move_distance,
-		pending_move_direction,
-		units[selected_unit]["move"],
 		map_data
 	)
 

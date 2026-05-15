@@ -112,11 +112,29 @@ func place_unit(
 	)
 
 	if ai_profile == "defender":
-		unit["home_pos"] = cell
-		unit["home_facing"] = facing
 		unit["leash_range"] = 3
 
 	units.append(unit)
+
+# =========================
+# Returns true if a cell lies
+# inside a rectangular region.
+#
+# Rectangle bounds are inclusive.
+# =========================
+
+func is_cell_inside_rect(
+	cell: Vector2i,
+	start_cell: Vector2i,
+	end_cell: Vector2i
+) -> bool:
+
+	return (
+		cell.x >= start_cell.x
+		and cell.x <= end_cell.x
+		and cell.y >= start_cell.y
+		and cell.y <= end_cell.y
+	)
 
 # =========================
 # Moves terrain and units inside
@@ -179,11 +197,10 @@ func move_selection(
 
 		var pos = unit["pos"]
 
-		if (
-			pos.x >= start_cell.x
-			and pos.x <= end_cell.x
-			and pos.y >= start_cell.y
-			and pos.y <= end_cell.y
+		if is_cell_inside_rect(
+			pos,
+			start_cell,
+			end_cell
 		):
 			copied_units.append(unit.duplicate(true))
 
@@ -207,11 +224,10 @@ func move_selection(
 
 		var pos = units[i]["pos"]
 
-		if (
-			pos.x >= start_cell.x
-			and pos.x <= end_cell.x
-			and pos.y >= start_cell.y
-			and pos.y <= end_cell.y
+		if is_cell_inside_rect(
+			pos,
+			start_cell,
+			end_cell
 		):
 			units.remove_at(i)
 
@@ -257,8 +273,7 @@ func move_selection(
 
 		unit["pos"] += offset
 
-		if unit.has("home_pos"):
-			unit["home_pos"] += offset
+		unit["home_pos"] += offset
 
 		units.append(unit)
 
@@ -282,9 +297,6 @@ func increase_unit_leash_range(
 
 	if unit_index >= units.size():
 		return
-
-	if not units[unit_index].has("leash_range"):
-		units[unit_index]["leash_range"] = 3
 
 	units[unit_index]["leash_range"] += 1
 
@@ -311,9 +323,6 @@ func decrease_unit_leash_range(
 
 	if unit_index >= units.size():
 		return
-
-	if not units[unit_index].has("leash_range"):
-		units[unit_index]["leash_range"] = 3
 
 	units[unit_index]["leash_range"] = max(
 		0,

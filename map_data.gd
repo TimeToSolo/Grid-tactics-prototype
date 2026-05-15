@@ -270,43 +270,6 @@ func get_grid_distance(start_cell: Vector2i, end_cell: Vector2i) -> int:
 		+ abs(end_cell.y - start_cell.y)
 	)
 
-
-# =========================
-# Returns true if a tile is at maximum movement range.
-#
-# Used to indicate limited pivot movement.
-# =========================
-
-func is_max_range_tile(
-	start: Vector2i,
-	target: Vector2i,
-	move_points: int
-) -> bool:
-
-	return get_grid_distance(start, target) >= move_points
-
-
-# =========================
-# Returns the general direction moved.
-#
-# Examples:
-# - west      = Vector2i(-1, 0)
-# - northeast = Vector2i(1, -1)
-# =========================
-
-func get_primary_direction(
-	start_cell: Vector2i,
-	end_cell: Vector2i
-) -> Vector2i:
-
-	var diff = end_cell - start_cell
-
-	return Vector2i(
-		sign(diff.x),
-		sign(diff.y)
-	)
-
-
 # ==================================================
 # MOVEMENT RANGE
 # ==================================================
@@ -384,7 +347,6 @@ func get_move_range(
 #
 # Returns:
 # - cost: actual movement cost spent
-# - final_direction: direction of last step
 # - path_cells: ordered path from start to target
 # =========================
 
@@ -431,17 +393,8 @@ func get_movement_path_data(
 
 			path_cells.push_front(start)
 
-			var final_direction = Vector2i.ZERO
-
-			if path_cells.size() >= 2:
-				final_direction = (
-					path_cells[path_cells.size() - 1]
-					- path_cells[path_cells.size() - 2]
-				)
-
 			return {
 				"cost": cost_so_far[target],
-				"final_direction": final_direction,
 				"path_cells": path_cells
 			}
 

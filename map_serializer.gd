@@ -20,19 +20,19 @@ func save_map(
 
 	for unit in units:
 
-		var ai_profile = "barbarian"
-
-		if unit.has("ai_profile"):
-			ai_profile = unit["ai_profile"]
-
 		save_data["units"].append({
 			"class": unit["class"],
 			"team": unit["team"],
-			"ai_profile": ai_profile,
+			"ai_profile": unit["ai_profile"],
 			"pos_x": unit["pos"].x,
 			"pos_y": unit["pos"].y,
 			"facing_x": unit["facing"].x,
-			"facing_y": unit["facing"].y
+			"facing_y": unit["facing"].y,
+			"home_x": unit["home_pos"].x,
+			"home_y": unit["home_pos"].y,
+			"home_facing_x": unit["home_facing"].x,
+			"home_facing_y": unit["home_facing"].y,
+			"leash_range": unit["leash_range"]
 		})
 
 	DirAccess.make_dir_recursive_absolute("user://maps")
@@ -83,7 +83,6 @@ func load_map(
 
 	map_data.grid_width = data["width"]
 	map_data.grid_height = data["height"]
-
 	map_data.terrain_map = data["terrain_map"]
 
 	units.clear()
@@ -108,6 +107,21 @@ func load_map(
 			),
 			ai_profile
 		)
+
+		if unit_info.has("home_x"):
+			unit["home_pos"] = Vector2i(
+				unit_info["home_x"],
+				unit_info["home_y"]
+			)
+
+		if unit_info.has("home_facing_x"):
+			unit["home_facing"] = Vector2i(
+				unit_info["home_facing_x"],
+				unit_info["home_facing_y"]
+			)
+
+		if unit_info.has("leash_range"):
+			unit["leash_range"] = unit_info["leash_range"]
 
 		units.append(unit)
 

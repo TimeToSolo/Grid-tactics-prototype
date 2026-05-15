@@ -14,29 +14,23 @@ extends Node
 # It only returns whether a defender was defeated.
 # ==================================================
 
-
 # =========================
-# Resolves attack damage from one unit to another.
+# Returns final attack damage.
 #
-# damage_multiplier:
-# - used for counter/reaction damage scaling
-# - normal attacks use 1.0
+# Handles:
+# - archer movement scaling
+# - counter/reaction multipliers
 #
-# Returns:
-# - true if defender is defeated
-# - false otherwise
+# Does NOT apply damage.
 # =========================
 
-func resolve_attack(
+func get_attack_damage(
 	attacker,
-	defender,
 	damage_multiplier: float = 1.0
-) -> bool:
+) -> int:
 
 	var damage = attacker["attack"]
 
-	# Archer attacks lose damage based on
-	# how many tiles worth of stamina were spent moving.
 	if attacker["class"] == "archer":
 
 		var spent_stamina = (
@@ -49,23 +43,37 @@ func resolve_attack(
 			/ float(attacker["move_stamina_cost"])
 		))
 
-		var move_damage_penalty = 2
-
-		if attacker.has("move_damage_penalty"):
-			move_damage_penalty = attacker["move_damage_penalty"]
+		var move_damage_penalty = attacker["move_damage_penalty"]
 
 		damage = max(
 			attacker["attack"] - moved_tiles * move_damage_penalty,
 			1
 		)
 
-	# Counter/reaction attacks can scale damage separately.
-	damage = int(round(damage * damage_multiplier))
+	return int(round(damage * damage_multiplier))
+
+# =========================
+# Applies attack damage to defender.
+#
+# Returns:
+# - true if defender is defeated
+# - false otherwise
+# =========================
+
+func resolve_attack(
+	attacker,
+	defender,
+	damage_multiplier: float = 1.0
+) -> bool:
+
+	var damage = get_attack_damage(
+		attacker,
+		damage_multiplier
+	)
 
 	defender["hp"] -= damage
 
 	return defender["hp"] <= 0
-
 
 # =========================
 # Applies instant healing to a unit.

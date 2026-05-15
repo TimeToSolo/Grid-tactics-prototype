@@ -16,9 +16,9 @@ extends Node
 # TURN STATE
 # ==================================================
 
-var team_order = ["player", "enemy"]
+var team_order: Array[String] = ["player", "enemy"]
 var current_team_index := 0
-var current_team = team_order[current_team_index]
+var current_team: String = team_order[current_team_index]
 
 # ==================================================
 # TURN FLOW
@@ -31,7 +31,7 @@ var current_team = team_order[current_team_index]
 # belonging to the new active team.
 # =========================
 
-func end_turn(units):
+func end_turn(units: Array):
 	current_team_index = (current_team_index + 1) % team_order.size()
 	current_team = team_order[current_team_index]
 	refresh_team_units(units, current_team)
@@ -45,7 +45,10 @@ func end_turn(units):
 # - applying regeneration healing
 # =========================
 
-func refresh_team_units(units, team):
+func refresh_team_units(
+	units: Array,
+	team: String
+):
 
 	for unit in units:
 
@@ -72,7 +75,7 @@ func refresh_team_units(units, team):
 # - loses 1 remaining turn after triggering
 # =========================
 
-func apply_regen_if_active(unit):
+func apply_regen_if_active(unit: Dictionary):
 
 	if not unit.has("regen_turns"):
 		return

@@ -93,14 +93,8 @@ var move_tiles: Array[Vector2i] = []
 # Pending destination tile.
 var pending_move_cell: Vector2i = Vector2i(-1, -1)
 
-# Pending facing direction after movement.
-var pending_facing: Vector2i = Vector2i.ZERO
-
 # Distance moved during pending movement.
 var pending_move_distance = 0
-
-# Primary movement direction.
-var pending_move_direction: Vector2i = Vector2i.ZERO
 
 # Original position before movement begins.
 var selected_unit_start_cell: Vector2i = Vector2i(-1, -1)
@@ -214,11 +208,6 @@ var editor_ai_profiles_by_class = {
 		"support_healer"
 	]
 }
-
-# =========================
-# Cycles the AI profile used
-# when placing units in editor mode.
-# =========================
 
 # =========================
 # Cycles the AI profile used
@@ -463,7 +452,7 @@ func start_editor_resize_mode():
 var pending_attack_target = -1
 
 # Pending heal/regeneration target.
-var pending_heal_target = -1
+var pending_support_target = -1
 
 # Enemy providing delayed coverage reaction.
 var pending_coverage_enemies: Array[int] = []
@@ -474,7 +463,7 @@ var pending_coverage_enemies: Array[int] = []
 # ==================================================
 
 var awaiting_attack_confirmation = false
-var awaiting_heal_confirmation = false
+var awaiting_support_confirmation = false
 var awaiting_wait_confirmation = false
 
 
@@ -990,7 +979,6 @@ func _draw():
 		map_data,
 		units,
 		selected_unit,
-		selected_unit_start_cell,
 		move_tiles
 	)
 	
@@ -1054,8 +1042,6 @@ func _draw():
 		selected_unit,
 		move_tiles,
 		pending_move_cell,
-		pending_move_distance,
-		pending_move_direction,
 		has_pending_move(),
 		get_valid_lancer_facing_tiles()
 	)
@@ -1070,8 +1056,6 @@ func _draw():
 		units,
 		selected_unit,
 		pending_move_cell,
-		pending_move_distance,
-		pending_move_direction,
 		hovered_cell,
 		has_pending_move(),
 		get_valid_lancer_facing_tiles()
@@ -1134,7 +1118,7 @@ func _draw():
 
 	render_system.draw_heal_confirmation_prompt(
 		self,
-		awaiting_heal_confirmation
+		awaiting_support_confirmation
 	)
 
 	draw_editor_rect_preview()
@@ -1682,8 +1666,8 @@ func handle_attack_confirm_hotkey():
 
 func handle_heal_hotkey():
 
-	if awaiting_heal_confirmation:
-		confirm_heal()
+	if awaiting_support_confirmation:
+		confirm_support_action("heal")
 
 
 # =========================
@@ -1692,8 +1676,8 @@ func handle_heal_hotkey():
 
 func handle_regen_hotkey():
 
-	if awaiting_heal_confirmation:
-		confirm_regen()
+	if awaiting_support_confirmation:
+		confirm_support_action("regen")
 
 
 # =========================
@@ -1982,10 +1966,10 @@ func handle_left_click():
 
 			awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
 			awaiting_attack_confirmation = state["awaiting_attack_confirmation"]
-			awaiting_heal_confirmation = state["awaiting_heal_confirmation"]
+			awaiting_support_confirmation = state["awaiting_support_confirmation"]
 
 			pending_attack_target = state["pending_attack_target"]
-			pending_heal_target = state["pending_heal_target"]
+			pending_support_target = state["pending_support_target"]
 
 			queue_redraw()
 			return
@@ -2001,7 +1985,7 @@ func handle_left_click():
 			hover_query,
 			map_data
 		):
-			var state = action_system.get_heal_confirmation_state(
+			var state = action_system.get_support_confirmation_state(
 				units,
 				selected_unit,
 				clicked_cell,
@@ -2010,9 +1994,9 @@ func handle_left_click():
 
 			if not state.is_empty():
 
-				pending_heal_target = state["pending_heal_target"]
+				pending_support_target = state["pending_support_target"]
 
-				awaiting_heal_confirmation = state["awaiting_heal_confirmation"]
+				awaiting_support_confirmation = state["awaiting_support_confirmation"]
 				awaiting_attack_confirmation = state["awaiting_attack_confirmation"]
 				awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
 
@@ -2045,10 +2029,10 @@ func handle_left_click():
 				pending_attack_target = state["pending_attack_target"]
 
 				awaiting_attack_confirmation = state["awaiting_attack_confirmation"]
-				awaiting_heal_confirmation = state["awaiting_heal_confirmation"]
+				awaiting_support_confirmation = state["awaiting_support_confirmation"]
 				awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
 
-				pending_heal_target = state["pending_heal_target"]
+				pending_support_target = state["pending_support_target"]
 
 				queue_redraw()
 
@@ -2074,10 +2058,10 @@ func handle_left_click():
 
 			awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
 			awaiting_attack_confirmation = state["awaiting_attack_confirmation"]
-			awaiting_heal_confirmation = state["awaiting_heal_confirmation"]
+			awaiting_support_confirmation = state["awaiting_support_confirmation"]
 
 			pending_attack_target = state["pending_attack_target"]
-			pending_heal_target = state["pending_heal_target"]
+			pending_support_target = state["pending_support_target"]
 
 			queue_redraw()
 			return
@@ -2087,8 +2071,6 @@ func handle_left_click():
 			selected_unit,
 			clicked_cell,
 			pending_move_cell,
-			pending_move_distance,
-			pending_move_direction,
 			hovered_cell,
 			has_pending_move(),
 			unit_logic,
@@ -2115,8 +2097,8 @@ func handle_left_click():
 # Returns all valid lancer
 # facing-selection tiles.
 #
-# Filters lancer attack tiles using
-# movement-based facing restrictions.
+# Converts valid lancer target tiles
+# into legal facing-selection tiles.
 # =========================
 
 func get_valid_lancer_facing_tiles() -> Array[Vector2i]:
@@ -2125,9 +2107,7 @@ func get_valid_lancer_facing_tiles() -> Array[Vector2i]:
 		unit_logic,
 		action_query,
 		map_data,
-		pending_move_cell,
-		pending_move_direction,
-		used_max_movement()
+		pending_move_cell
 	)
 
 # =========================
@@ -2143,9 +2123,7 @@ func clear_selection():
 	move_tiles = state["move_tiles"]
 
 	pending_move_cell = state["pending_move_cell"]
-	pending_facing = state["pending_facing"]
 	pending_move_distance = state["pending_move_distance"]
-	pending_move_direction = state["pending_move_direction"]
 	pending_coverage_enemies = state["pending_coverage_enemies"]
 
 	hover_path_cells.clear()
@@ -2169,17 +2147,15 @@ func clear_pending_action_state():
 	move_tiles = state["move_tiles"]
 
 	pending_move_cell = state["pending_move_cell"]
-	pending_facing = state["pending_facing"]
 	pending_move_distance = state["pending_move_distance"]
-	pending_move_direction = state["pending_move_direction"]
 	pending_coverage_enemies = state["pending_coverage_enemies"]
 
 	awaiting_attack_confirmation = state["awaiting_attack_confirmation"]
-	awaiting_heal_confirmation = state["awaiting_heal_confirmation"]
+	awaiting_support_confirmation = state["awaiting_support_confirmation"]
 	awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
 
 	pending_attack_target = state["pending_attack_target"]
-	pending_heal_target = state["pending_heal_target"]
+	pending_support_target = state["pending_support_target"]
 
 	hover_path_cells.clear()
 
@@ -2191,16 +2167,6 @@ func has_pending_move() -> bool:
 
 	return selection_state.has_pending_move(
 		pending_move_cell
-	)
-
-
-func used_max_movement() -> bool:
-
-	return selection_state.used_max_movement(
-		units,
-		selected_unit,
-		pending_move_cell,
-		pending_move_distance
 	)
 
 # =========================
@@ -2265,16 +2231,14 @@ func select_unit(unit_index: int):
 	move_tiles = state["move_tiles"]
 
 	pending_move_cell = state["pending_move_cell"]
-	pending_facing = state["pending_facing"]
 	pending_move_distance = state["pending_move_distance"]
-	pending_move_direction = state["pending_move_direction"]
 	pending_coverage_enemies = state["pending_coverage_enemies"]
 
 	pending_attack_target = state["pending_attack_target"]
-	pending_heal_target = state["pending_heal_target"]
+	pending_support_target = state["pending_support_target"]
 
 	awaiting_attack_confirmation = state["awaiting_attack_confirmation"]
-	awaiting_heal_confirmation = state["awaiting_heal_confirmation"]
+	awaiting_support_confirmation = state["awaiting_support_confirmation"]
 	awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
 
 	queue_redraw()
@@ -2307,9 +2271,7 @@ func handle_move_tile_click(clicked_cell: Vector2i):
 		return
 
 	pending_move_cell = result["pending_move_cell"]
-	pending_facing = result["pending_facing"]
 	pending_move_distance = result["pending_move_distance"]
-	pending_move_direction = result["pending_move_direction"]
 	pending_coverage_enemies = result["pending_coverage_enemies"]
 
 	queue_redraw()
@@ -2335,15 +2297,12 @@ func handle_facing_click(clicked_cell: Vector2i):
 		clicked_cell,
 		pending_move_cell,
 		pending_move_distance,
-		pending_move_direction,
 		pending_coverage_enemies,
 		get_valid_lancer_facing_tiles()
 	)
 
 	if result.is_empty():
 		return
-
-	pending_facing = result["pending_facing"]
 
 	if result["unit_died"]:
 		units.remove_at(result["remove_index"])
@@ -2457,71 +2416,31 @@ func confirm_wait():
 	queue_redraw()
 	process_ai_turn_if_needed()
 
-
 # =========================
-# Confirms instant heal action.
+# Confirms selected support action.
 # =========================
 
-func confirm_heal():
+func confirm_support_action(
+	support_action: String
+):
 
-	var result = action_system.confirm_heal(
+	var result = action_system.confirm_support_action(
 		units,
 		combat_logic,
 		coverage_system,
 		stamina_system,
 		selected_unit,
-		pending_heal_target,
+		pending_support_target,
 		pending_move_distance,
-		pending_coverage_enemies
+		pending_coverage_enemies,
+		support_action
 	)
 
 	if result.is_empty():
 		return
 
-	awaiting_heal_confirmation = result["awaiting_heal_confirmation"]
-	pending_heal_target = result["pending_heal_target"]
-
-	if result["unit_died"]:
-		units.remove_at(result["remove_index"])
-		clear_selection()
-		queue_redraw()
-		return
-
-	clear_selection()
-
-	turn_number = action_system.auto_end_turn_if_needed(
-		units,
-		turn_manager,
-		stamina_system,
-		turn_number
-	)
-
-	queue_redraw()
-	process_ai_turn_if_needed()
-
-
-# =========================
-# Confirms regeneration action.
-# =========================
-
-func confirm_regen():
-
-	var result = action_system.confirm_regen(
-		units,
-		combat_logic,
-		coverage_system,
-		stamina_system,
-		selected_unit,
-		pending_heal_target,
-		pending_move_distance,
-		pending_coverage_enemies
-	)
-
-	if result.is_empty():
-		return
-
-	awaiting_heal_confirmation = result["awaiting_heal_confirmation"]
-	pending_heal_target = result["pending_heal_target"]
+	awaiting_support_confirmation = result["awaiting_support_confirmation"]
+	pending_support_target = result["pending_support_target"]
 
 	if result["unit_died"]:
 		units.remove_at(result["remove_index"])

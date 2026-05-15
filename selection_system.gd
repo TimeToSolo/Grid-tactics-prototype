@@ -11,7 +11,7 @@ extends Node
 # Selects a unit and prepares
 # movement/action state.
 #
-# Returns full selection state.
+# Returns full selection + pending action state.
 # =========================
 
 func select_unit(
@@ -23,9 +23,7 @@ func select_unit(
 
 	var selected_unit = unit_index
 
-	var selected_unit_start_cell = (
-		units[selected_unit]["pos"]
-	)
+	var selected_unit_start_cell = units[selected_unit]["pos"]
 
 	var move_tiles = map_data.get_move_range(
 		units[selected_unit]["pos"],
@@ -42,16 +40,14 @@ func select_unit(
 		"move_tiles": move_tiles,
 
 		"pending_move_cell": Vector2i(-1, -1),
-		"pending_facing": Vector2i.ZERO,
 		"pending_move_distance": 0,
-		"pending_move_direction": Vector2i.ZERO,
 		"pending_coverage_enemies": [] as Array[int],
 
 		"pending_attack_target": -1,
-		"pending_heal_target": -1,
+		"pending_support_target": -1,
 
 		"awaiting_attack_confirmation": false,
-		"awaiting_heal_confirmation": false,
+		"awaiting_support_confirmation": false,
 		"awaiting_wait_confirmation": false
 	}
 
@@ -118,9 +114,7 @@ func clear_selection() -> Dictionary:
 		"move_tiles": [] as Array[Vector2i],
 
 		"pending_move_cell": Vector2i(-1, -1),
-		"pending_facing": Vector2i.ZERO,
 		"pending_move_distance": 0,
-		"pending_move_direction": Vector2i.ZERO,
 		"pending_coverage_enemies": [] as Array[int]
 	}
 
@@ -136,10 +130,10 @@ func clear_pending_action_state() -> Dictionary:
 	var state = clear_selection()
 
 	state["awaiting_attack_confirmation"] = false
-	state["awaiting_heal_confirmation"] = false
+	state["awaiting_support_confirmation"] = false
 	state["awaiting_wait_confirmation"] = false
 
 	state["pending_attack_target"] = -1
-	state["pending_heal_target"] = -1
+	state["pending_support_target"] = -1
 
 	return state

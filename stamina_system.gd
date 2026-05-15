@@ -96,6 +96,38 @@ func get_display_stamina(
 		0
 	)
 
+# =========================
+# Spends stamina for a support action.
+# =========================
+
+func spend_support_stamina(
+	units: Array,
+	unit_index: int,
+	support_action: String
+):
+
+	if unit_index == -1:
+		return
+
+	var stamina_cost = 0
+
+	match support_action:
+
+		"heal":
+			stamina_cost = units[unit_index]["heal_stamina_cost"]
+
+		"regen":
+			stamina_cost = units[unit_index]["regen_stamina_cost"]
+
+		_:
+			return
+
+	units[unit_index]["stamina"] = max(
+		units[unit_index]["stamina"] - stamina_cost,
+		0
+	)
+
+	units[unit_index]["heal_charges"] -= 1
 
 # =========================
 # Recovers healer charges based on

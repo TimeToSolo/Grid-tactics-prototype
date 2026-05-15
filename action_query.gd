@@ -18,8 +18,6 @@ func should_handle_facing_click(
 	selected_unit: int,
 	clicked_cell: Vector2i,
 	pending_move_cell: Vector2i,
-	pending_move_distance: int,
-	pending_move_direction: Vector2i,
 	hovered_cell: Vector2i,
 	has_pending_move: bool,
 	unit_logic,
@@ -64,9 +62,6 @@ func should_handle_facing_click(
 
 	var facing_tiles = unit_logic.get_facing_choice_tiles(
 		pending_move_cell,
-		pending_move_distance,
-		pending_move_direction,
-		units[selected_unit]["move"],
 		map_data
 	)
 

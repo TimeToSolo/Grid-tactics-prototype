@@ -29,7 +29,7 @@ func is_hovering_attackable_enemy(
 	if not has_pending_move:
 		return false
 
-	var attack_tiles: Array[Vector2i] = []
+	var attack_tiles: Array[Vector2i]
 
 	if units[selected_unit]["class"] == "healer":
 		attack_tiles = unit_logic.get_adjacent_choice_tiles(

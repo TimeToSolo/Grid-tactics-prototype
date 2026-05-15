@@ -121,28 +121,32 @@ func get_path_preview_from_path(
 		var previous_cell = path_cells[i - 1]
 		var current_cell = path_cells[i]
 
-		var entered_enemies = coverage_system.get_enemies_entered_coverage(
+		var step_path: Array[Vector2i] = [
+			previous_cell,
+			current_cell
+		]
+
+		var entered_enemies = coverage_system.get_enemies_entered_coverage_along_path(
 			units,
 			unit_logic,
 			selected_unit,
-			previous_cell,
-			current_cell
+			step_path
 		)
 
-		if not entered_enemies.is_empty():
+		if entered_enemies.is_empty():
+			continue
 
-			danger_cells.append(current_cell)
+		danger_cells.append(current_cell)
 
-			for enemy in entered_enemies:
-				if not countering_units.has(enemy):
-					countering_units.append(enemy)
+		for enemy in entered_enemies:
+			if not countering_units.has(enemy):
+				countering_units.append(enemy)
 
 	return {
 		"path_cells": path_cells,
 		"danger_cells": danger_cells,
 		"countering_units": countering_units
 	}
-
 
 # =========================
 # Fallback helper for when cursor jumps

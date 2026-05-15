@@ -68,9 +68,6 @@ func get_unit_color(unit_class: String) -> Color:
 # Returns all attack preview tiles from possible movement tiles.
 #
 # Used before choosing a destination.
-#
-# This shows every tile the unit could attack
-# after moving somewhere within movement range.
 # =========================
 
 func get_attack_tiles(
@@ -80,36 +77,13 @@ func get_attack_tiles(
 	map_data
 ) -> Array[Vector2i]:
 
-	var tiles: Array[Vector2i] = []
 	var move_tiles_local = map_data.get_move_range(start, move_points)
 
-	for move_tile in move_tiles_local:
-
-		if is_adjacent_attacker(unit_class):
-			add_adjacent_attack_tiles(
-				tiles,
-				move_tile,
-				move_tiles_local,
-				map_data
-			)
-
-		elif unit_class == "lancer":
-			add_lancer_attack_tiles(
-				tiles,
-				move_tile,
-				move_tiles_local,
-				map_data
-			)
-
-		elif unit_class == "archer":
-			add_archer_attack_tiles(
-				tiles,
-				move_tile,
-				move_tiles_local,
-				map_data
-			)
-
-	return tiles
+	return get_attack_tiles_from_move_tiles(
+		move_tiles_local,
+		unit_class,
+		map_data
+	)
 
 # =========================
 # Builds attack tiles from
@@ -332,8 +306,8 @@ func add_archer_attack_tiles(
 # =========================
 # Returns lancer offsets used for movement attack preview.
 #
-# This is slightly narrower than the full targeting list,
-# matching the current prototype behavior.
+# Preview excludes some close-range lancer targets
+# to avoid overlapping movement tiles too heavily.
 # =========================
 
 func get_lancer_preview_offsets() -> Array[Vector2i]:
@@ -430,78 +404,20 @@ func is_valid_archer_target(
 # ==================================================
 
 # =========================
-# Returns limited facing directions after max-range movement.
-#
-# Prevents a unit from sprinting in one direction
-# and instantly pivoting to face directly backward.
-# =========================
-
-func get_limited_facing_dirs(move_dir: Vector2i) -> Array[Vector2i]:
-
-	var allowed: Array[Vector2i] = []
-
-	for dir: Vector2i in directions:
-
-		if Vector2(move_dir).dot(Vector2(dir)) >= 0:
-			allowed.append(dir)
-
-	return allowed
-
-# =========================
-# Returns all possible facing directions.
-#
-# Used when a unit did not spend
-# its full movement range.
-# =========================
-
-func get_all_facing_dirs() -> Array[Vector2i]:
-
-	return [
-		Vector2i(-1, -1),
-		Vector2i(0, -1),
-		Vector2i(1, -1),
-		Vector2i(-1, 0),
-		Vector2i(1, 0),
-		Vector2i(-1, 1),
-		Vector2i(0, 1),
-		Vector2i(1, 1)
-	]
-
-# =========================
-# Returns valid facing tiles around a pending destination.
-#
-# If the unit moved its full movement range,
-# facing is restricted by movement direction.
+# Builds the list of selectable facing directions after movement.
 # =========================
 
 func get_facing_choice_tiles(
 	center: Vector2i,
-	move_distance: int,
-	move_direction: Vector2i,
-	max_move: int,
 	map_data
 ) -> Array[Vector2i]:
 
-	var tiles: Array[Vector2i] = []
-	var allowed_dirs: Array[Vector2i] = directions
-
-	if move_distance >= max_move:
-		allowed_dirs = get_limited_facing_dirs(move_direction)
-
-	for dir in allowed_dirs:
-
-		var tile = center + dir
-
-		if map_data.is_inside_grid(tile):
-			tiles.append(tile)
-
-	return tiles
-
+	return get_adjacent_choice_tiles(center, map_data)
 
 # =========================
 # Returns all 8 adjacent tiles around a center tile.
 #
-# Used when targeting should ignore limited pivot rules.
+# Used for simple adjacent targeting.
 # =========================
 
 func get_adjacent_choice_tiles(
@@ -676,7 +592,7 @@ func get_lancer_coverage(
 ) -> Array[Vector2i]:
 
 	var tiles: Array[Vector2i] = []
-	var is_cardinal = facing.x == 0 or facing.y == 0
+	var is_cardinal := facing.x == 0 or facing.y == 0
 
 	if is_cardinal:
 

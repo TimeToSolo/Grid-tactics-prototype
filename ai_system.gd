@@ -168,18 +168,22 @@ func take_unit_turn(
 
 func get_archer_expected_damage_after_move(
 	unit,
-	move_distance: int
+	move_distance: int,
+	combat_logic
 ) -> int:
 
-	var move_damage_penalty = 2
+	var simulated_unit = unit.duplicate()
 
-	if unit.has("move_damage_penalty"):
-		move_damage_penalty = unit["move_damage_penalty"]
-
-	return max(
-		unit["attack"] - move_distance * move_damage_penalty,
-		1
+	simulated_unit["stamina"] = max(
+		simulated_unit["max_stamina"]
+		- (
+			move_distance
+			* simulated_unit["move_stamina_cost"]
+		),
+		0
 	)
+
+	return combat_logic.get_attack_damage(simulated_unit)
 
 # =========================
 # Returns preferred retreat distance
@@ -197,20 +201,48 @@ func get_archer_expected_damage_after_move(
 
 func get_archer_desired_retreat_distance(
 	archer,
-	target
+	target,
+	combat_logic
 ) -> int:
 
 	for retreat_distance in [2, 1, 0]:
 
 		var expected_damage = get_archer_expected_damage_after_move(
 			archer,
-			retreat_distance
+			retreat_distance,
+			combat_logic
 		)
 
 		if target["hp"] <= expected_damage:
 			return retreat_distance
 
 	return 2
+
+# =========================
+# Returns attack tiles for AI evaluation.
+#
+# Healers use adjacent attacks.
+# Other classes use normal attack ranges.
+# =========================
+
+func get_ai_attack_tiles(
+	unit,
+	from_cell: Vector2i,
+	unit_logic,
+	map_data
+) -> Array[Vector2i]:
+
+	if unit["class"] == "healer":
+		return unit_logic.get_adjacent_choice_tiles(
+			from_cell,
+			map_data
+		)
+
+	return unit_logic.get_attack_choice_tiles(
+		from_cell,
+		unit["class"],
+		map_data
+	)
 
 # =========================
 # Returns true if a unit can attack
@@ -244,22 +276,12 @@ func can_attack_target_from_cell(
 	var attacker = units[attacker_index]
 	var target = units[target_index]
 
-	var attack_tiles: Array[Vector2i] = []
-
-	if attacker["class"] == "healer":
-
-		attack_tiles = unit_logic.get_adjacent_choice_tiles(
-			test_cell,
-			map_data
-		)
-
-	else:
-
-		attack_tiles = unit_logic.get_attack_choice_tiles(
-			test_cell,
-			attacker["class"],
-			map_data
-		)
+	var attack_tiles = get_ai_attack_tiles(
+		attacker,
+		test_cell,
+		unit_logic,
+		map_data
+	)
 
 	return attack_tiles.has(target["pos"])
 	
@@ -389,7 +411,8 @@ func process_cautious_ranged_turn(
 
 		var desired_retreat_distance = get_archer_desired_retreat_distance(
 			units[unit_index],
-			units[target_index]
+			units[target_index],
+			combat_logic
 		)
 
 		destination = get_best_archer_retreat_tile(
@@ -411,18 +434,9 @@ func process_cautious_ranged_turn(
 			unit_logic
 		)
 
-	var move_direction = Vector2i(
-		sign(destination.x - start_pos.x),
-		sign(destination.y - start_pos.y)
-	)
-
 	var move_distance = map_data.get_grid_distance(
 		start_pos,
 		destination
-	)
-
-	var used_max_movement = (
-		move_distance >= units[unit_index]["move"]
 	)
 
 	units[unit_index]["pos"] = destination
@@ -457,9 +471,6 @@ func process_cautious_ranged_turn(
 			units,
 			unit_index,
 			target_index,
-			unit_logic,
-			move_direction,
-			used_max_movement
 		)
 
 	units[unit_index]["has_acted"] = true
@@ -593,18 +604,9 @@ func process_barbarian_turn(
 		map_data
 	)
 
-	var move_direction = Vector2i(
-		sign(destination.x - start_pos.x),
-		sign(destination.y - start_pos.y)
-	)
-
 	var move_distance = map_data.get_grid_distance(
 		start_pos,
 		destination
-	)
-
-	var used_max_movement = (
-		move_distance >= units[unit_index]["move"]
 	)
 
 	units[unit_index]["pos"] = destination
@@ -645,9 +647,6 @@ func process_barbarian_turn(
 			units,
 			unit_index,
 			target_index,
-			unit_logic,
-			move_direction,
-			used_max_movement
 		)
 
 	units[unit_index]["has_acted"] = true
@@ -679,22 +678,12 @@ func try_attack_target(
 	var attacker = units[attacker_index]
 	var target = units[target_index]
 
-	var attack_tiles: Array[Vector2i] = []
-
-	if attacker["class"] == "healer":
-
-		attack_tiles = unit_logic.get_adjacent_choice_tiles(
-			attacker["pos"],
-			map_data
-		)
-
-	else:
-
-		attack_tiles = unit_logic.get_attack_choice_tiles(
-			attacker["pos"],
-			attacker["class"],
-			map_data
-		)
+	var attack_tiles = get_ai_attack_tiles(
+		attacker,
+		attacker["pos"],
+		unit_logic,
+		map_data
+	)
 
 	if not attack_tiles.has(target["pos"]):
 		return false
@@ -899,8 +888,6 @@ func get_best_move_toward_target(
 # =========================
 # Faces a unit toward a target unit.
 #
-# Respects movement-based facing limits.
-#
 # Used when an AI unit waits after moving
 # without attacking, so its coverage points
 # toward the nearest enemy.
@@ -910,9 +897,6 @@ func face_target(
 	units: Array,
 	unit_index: int,
 	target_index: int,
-	unit_logic,
-	move_direction: Vector2i,
-	used_max_movement: bool
 ):
 
 	if unit_index == -1:
@@ -937,24 +921,10 @@ func face_target(
 		sign(desired_direction.y)
 	)
 
-	var allowed_dirs: Array[Vector2i]
-
-	if used_max_movement:
-
-		allowed_dirs = unit_logic.get_limited_facing_dirs(
-			move_direction
-		)
-
-	else:
-
-		allowed_dirs = unit_logic.get_all_facing_dirs()
-
-	if allowed_dirs.has(desired_direction):
-
-		units[unit_index]["facing"] = desired_direction
+	if desired_direction == Vector2i.ZERO:
 		return
 
-	units[unit_index]["facing"] = allowed_dirs[0]
+	units[unit_index]["facing"] = desired_direction
 
 # =========================
 # Processes one defender AI turn.
@@ -1053,18 +1023,9 @@ func process_defender_turn(
 		unit_logic
 	)
 
-	var move_direction = Vector2i(
-		sign(destination.x - start_pos.x),
-		sign(destination.y - start_pos.y)
-	)
-
 	var move_distance = map_data.get_grid_distance(
 		start_pos,
 		destination
-	)
-
-	var used_max_movement = (
-		move_distance >= units[unit_index]["move"]
 	)
 
 	units[unit_index]["pos"] = destination
@@ -1100,9 +1061,6 @@ func process_defender_turn(
 			units,
 			unit_index,
 			target_index,
-			unit_logic,
-			move_direction,
-			used_max_movement
 		)
 
 	units[unit_index]["has_acted"] = true
@@ -1509,12 +1467,10 @@ func try_heal_target(
 		healer["heal_amount"]
 	)
 
-	if healer.has("heal_charges"):
-		healer["heal_charges"] -= 1
-
-	healer["stamina"] = max(
-		healer["stamina"] - healer["heal_stamina_cost"],
-		0
+	stamina_system.spend_support_stamina(
+		units,
+		healer_index,
+		"heal"
 	)
 
 	healer["has_acted"] = true

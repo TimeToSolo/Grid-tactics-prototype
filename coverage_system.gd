@@ -32,51 +32,6 @@ func has_active_coverage(
 
 	return true
 
-
-# =========================
-# Returns all enemies whose coverage
-# the moving unit ENTERED.
-#
-# Does not trigger if:
-# - the unit started inside that same coverage
-# - the unit moves out of coverage
-# - the unit stands still inside coverage
-# =========================
-
-func get_enemies_entered_coverage(
-	units: Array,
-	unit_logic,
-	unit_index: int,
-	start_cell: Vector2i,
-	target_cell: Vector2i
-) -> Array[int]:
-
-	var covering_enemies: Array[int] = []
-
-	var moving_team = units[unit_index]["team"]
-
-	for i in range(units.size()):
-
-		if units[i]["team"] == moving_team:
-			continue
-
-		if not has_active_coverage(units, i):
-			continue
-
-		var covered_tiles = unit_logic.get_coverage_tiles(
-			units[i]["class"],
-			units[i]["pos"],
-			units[i]["facing"]
-		)
-
-		var started_in_coverage = covered_tiles.has(start_cell)
-		var ended_in_coverage = covered_tiles.has(target_cell)
-
-		if ended_in_coverage and not started_in_coverage:
-			covering_enemies.append(i)
-
-	return covering_enemies
-
 # =========================
 # Returns all enemies whose coverage
 # the moving unit ENTERED anywhere
@@ -134,7 +89,7 @@ func get_enemies_entered_coverage_along_path(
 # each resolve individually.
 #
 # Returns:
-# - true if selected unit dies
+# - true if moving unit dies
 # - false otherwise
 # =========================
 
@@ -186,10 +141,10 @@ func resolve_coverage_reaction(
 		0
 	)
 
-	var defender_died = combat_logic.resolve_attack(
+	var moving_unit_died = combat_logic.resolve_attack(
 		units[covering_unit],
 		units[moving_unit],
 		units[covering_unit]["counter_damage_multiplier"]
 	)
 
-	return defender_died
+	return moving_unit_died

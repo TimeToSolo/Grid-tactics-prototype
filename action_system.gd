@@ -16,9 +16,9 @@ func start_wait_confirmation() -> Dictionary:
 	return {
 		"awaiting_wait_confirmation": true,
 		"awaiting_attack_confirmation": false,
-		"awaiting_heal_confirmation": false,
+		"awaiting_support_confirmation": false,
 		"pending_attack_target": -1,
-		"pending_heal_target": -1
+		"pending_support_target": -1
 	}
 
 
@@ -31,9 +31,9 @@ func start_attack_confirmation(target_unit: int) -> Dictionary:
 	return {
 		"pending_attack_target": target_unit,
 		"awaiting_attack_confirmation": true,
-		"awaiting_heal_confirmation": false,
+		"awaiting_support_confirmation": false,
 		"awaiting_wait_confirmation": false,
-		"pending_heal_target": -1
+		"pending_support_target": -1
 	}
 
 
@@ -42,11 +42,11 @@ func start_attack_confirmation(target_unit: int) -> Dictionary:
 # on an allied unit.
 # =========================
 
-func start_heal_confirmation(target_unit: int) -> Dictionary:
+func start_support_confirmation(target_unit: int) -> Dictionary:
 
 	return {
-		"pending_heal_target": target_unit,
-		"awaiting_heal_confirmation": true,
+		"pending_support_target": target_unit,
+		"awaiting_support_confirmation": true,
 		"awaiting_attack_confirmation": false,
 		"awaiting_wait_confirmation": false,
 		"pending_attack_target": -1
@@ -81,11 +81,12 @@ func get_attack_confirmation_state(
 
 
 # =========================
-# Returns state needed to start heal
-# confirmation if clicked unit is ally.
+# Returns state needed to start
+# support confirmation if clicked
+# unit is ally.
 # =========================
 
-func get_heal_confirmation_state(
+func get_support_confirmation_state(
 	units: Array,
 	selected_unit: int,
 	clicked_cell: Vector2i,
@@ -102,10 +103,10 @@ func get_heal_confirmation_state(
 		selected_unit,
 		clicked_unit
 	):
-		return start_heal_confirmation(clicked_unit)
+		return start_support_confirmation(clicked_unit)
 
 	return {}
-	
+
 # =========================
 # Confirms wait action.
 #
@@ -197,37 +198,39 @@ func auto_end_turn_if_needed(
 	return turn_number
 
 # =========================
-# Confirms instant heal action.
+# Confirms healer support action.
+#
+# Supports:
+# - heal
+# - regen
 #
 # Returns:
 # - unit_died
 # - remove_index
 # - action_completed
-# - awaiting_heal_confirmation
-# - pending_heal_target
+# - awaiting_support_confirmation
+# - pending_support_target
 # =========================
 
-func confirm_heal(
+func confirm_support_action(
 	units: Array,
 	combat_logic,
 	coverage_system,
 	stamina_system,
 	selected_unit: int,
-	pending_heal_target: int,
+	pending_support_target: int,
 	pending_move_distance: int,
-	pending_coverage_enemies: Array[int]
+	pending_coverage_enemies: Array[int],
+	support_action: String
 ) -> Dictionary:
 
 	if selected_unit == -1:
 		return {}
 
-	if pending_heal_target == -1:
+	if pending_support_target == -1:
 		return {}
 
-	if units[selected_unit]["heal_charges"] <= 0:
-		return {}
-
-	var dead_index = selected_unit
+	units[selected_unit]["has_acted"] = true
 
 	if coverage_system.resolve_pending_coverage_if_needed(
 		units,
@@ -237,10 +240,10 @@ func confirm_heal(
 	):
 		return {
 			"unit_died": true,
-			"remove_index": dead_index,
+			"remove_index": selected_unit,
 			"action_completed": false,
-			"awaiting_heal_confirmation": false,
-			"pending_heal_target": -1
+			"awaiting_support_confirmation": false,
+			"pending_support_target": -1
 		}
 
 	stamina_system.spend_movement_stamina(
@@ -249,104 +252,36 @@ func confirm_heal(
 		pending_move_distance
 	)
 
-	combat_logic.apply_heal(
-		units[pending_heal_target],
-		units[selected_unit]["heal_amount"]
+	match support_action:
+
+		"heal":
+			combat_logic.apply_heal(
+				units[pending_support_target],
+				units[selected_unit]["heal_amount"]
+			)
+
+		"regen":
+			combat_logic.apply_regen(
+				units[pending_support_target],
+				units[selected_unit]["regen_amount"],
+				units[selected_unit]["regen_turns"]
+			)
+
+		_:
+			return {}
+
+	stamina_system.spend_support_stamina(
+		units,
+		selected_unit,
+		support_action
 	)
-
-	units[selected_unit]["heal_charges"] -= 1
-
-	units[selected_unit]["stamina"] = max(
-		units[selected_unit]["stamina"]
-		- units[selected_unit]["heal_stamina_cost"],
-		0
-	)
-
-	units[selected_unit]["has_acted"] = true
 
 	return {
 		"unit_died": false,
 		"remove_index": -1,
 		"action_completed": true,
-		"awaiting_heal_confirmation": false,
-		"pending_heal_target": -1
-	}
-	
-# =========================
-# Confirms regeneration action.
-#
-# Returns:
-# - unit_died
-# - remove_index
-# - action_completed
-# - awaiting_heal_confirmation
-# - pending_heal_target
-# =========================
-
-func confirm_regen(
-	units: Array,
-	combat_logic,
-	coverage_system,
-	stamina_system,
-	selected_unit: int,
-	pending_heal_target: int,
-	pending_move_distance: int,
-	pending_coverage_enemies: Array[int]
-) -> Dictionary:
-
-	if selected_unit == -1:
-		return {}
-
-	if pending_heal_target == -1:
-		return {}
-
-	if units[selected_unit]["heal_charges"] <= 0:
-		return {}
-
-	var dead_index = selected_unit
-
-	if coverage_system.resolve_pending_coverage_if_needed(
-		units,
-		combat_logic,
-		selected_unit,
-		pending_coverage_enemies
-	):
-		return {
-			"unit_died": true,
-			"remove_index": dead_index,
-			"action_completed": false,
-			"awaiting_heal_confirmation": false,
-			"pending_heal_target": -1
-		}
-
-	stamina_system.spend_movement_stamina(
-		units,
-		selected_unit,
-		pending_move_distance
-	)
-
-	combat_logic.apply_regen(
-		units[pending_heal_target],
-		units[selected_unit]["regen_amount"],
-		units[selected_unit]["regen_turns"]
-	)
-
-	units[selected_unit]["heal_charges"] -= 1
-
-	units[selected_unit]["stamina"] = max(
-		units[selected_unit]["stamina"]
-		- units[selected_unit]["regen_stamina_cost"],
-		0
-	)
-
-	units[selected_unit]["has_acted"] = true
-
-	return {
-		"unit_died": false,
-		"remove_index": -1,
-		"action_completed": true,
-		"awaiting_heal_confirmation": false,
-		"pending_heal_target": -1
+		"awaiting_support_confirmation": false,
+		"pending_support_target": -1
 	}
 
 # =========================
@@ -381,11 +316,11 @@ func confirm_attack(
 
 	var target_pos = units[pending_attack_target]["pos"]
 
-	var attack_direction = target_pos - pending_move_cell
+	var attack_diff = target_pos - pending_move_cell
 
-	attack_direction = Vector2i(
-		sign(attack_direction.x),
-		sign(attack_direction.y)
+	var attack_direction = Vector2i(
+		sign(attack_diff.x),
+		sign(attack_diff.y)
 	)
 
 	units[selected_unit]["facing"] = attack_direction

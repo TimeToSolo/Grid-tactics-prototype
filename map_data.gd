@@ -428,6 +428,112 @@ func get_movement_path_data(
 
 	return {}
 
+# =========================
+# Returns path data from start
+# to the closest passable tile
+# adjacent to a target.
+#
+# Used by AI so units can path
+# around rivers/walls toward enemies
+# instead of only reducing direct
+# grid distance.
+# =========================
+
+func get_path_to_nearest_adjacent_tile(
+	start: Vector2i,
+	target: Vector2i,
+	occupied_tiles: Array[Vector2i] = []
+) -> Dictionary:
+
+	var adjacent_targets: Array[Vector2i] = []
+
+	var dirs = [
+		Vector2i(1, 0),
+		Vector2i(-1, 0),
+		Vector2i(0, 1),
+		Vector2i(0, -1)
+	]
+
+	for dir in dirs:
+
+		var cell = target + dir
+
+		if not is_inside_grid(cell):
+			continue
+
+		if blocks_movement(cell):
+			continue
+
+		if occupied_tiles.has(cell):
+			continue
+
+		adjacent_targets.append(cell)
+
+	if adjacent_targets.is_empty():
+		return {}
+
+	var frontier = [{
+		"cell": start,
+		"cost": 0
+	}]
+
+	var came_from = {
+		start: start
+	}
+
+	var cost_so_far = {
+		start: 0
+	}
+
+	while frontier.size() > 0:
+
+		var current = frontier.pop_front()
+		var current_cell = current["cell"]
+
+		if adjacent_targets.has(current_cell):
+
+			var path_cells: Array[Vector2i] = []
+			var step = current_cell
+
+			while step != start:
+				path_cells.push_front(step)
+				step = came_from[step]
+
+			path_cells.push_front(start)
+
+			return {
+				"cost": cost_so_far[current_cell],
+				"path_cells": path_cells,
+				"target_cell": current_cell
+			}
+
+		for dir in dirs:
+
+			var next = current_cell + dir
+			var next_cost = cost_so_far[current_cell] + 1
+
+			if not is_inside_grid(next):
+				continue
+
+			if blocks_movement(next):
+				continue
+
+			if occupied_tiles.has(next):
+				continue
+
+			if cost_so_far.has(next):
+				continue
+
+			cost_so_far[next] = next_cost
+			came_from[next] = current_cell
+
+			frontier.append({
+				"cell": next,
+				"cost": next_cost
+			})
+
+	return {}
+
 # ==================================================
 # ATTACK LINE OF SIGHT
 # ==================================================

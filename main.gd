@@ -356,10 +356,10 @@ func handle_editor_resize_input(event):
 		KEY_LEFT:
 			editor_resize_width = max(1, editor_resize_width - 1)
 
-		KEY_DOWN:
+		KEY_UP:
 			editor_resize_height += 1
 
-		KEY_UP:
+		KEY_DOWN:
 			editor_resize_height = max(1, editor_resize_height - 1)
 
 		KEY_ENTER:

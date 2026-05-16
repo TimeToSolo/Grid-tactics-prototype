@@ -284,7 +284,81 @@ func can_attack_target_from_cell(
 	)
 
 	return attack_tiles.has(target["pos"])
-	
+
+# =========================
+# Moves an AI unit using real
+# path data and resolves coverage.
+#
+# Returns:
+# - true if the moving unit died
+# - false otherwise
+# =========================
+
+func move_ai_unit(
+	units: Array,
+	unit_index: int,
+	destination: Vector2i,
+	map_data,
+	unit_logic,
+	coverage_system,
+	combat_logic,
+	stamina_system
+) -> bool:
+
+	if unit_index == -1:
+		return false
+
+	if unit_index >= units.size():
+		return false
+
+	var start_pos = units[unit_index]["pos"]
+
+	if start_pos == destination:
+		return false
+
+	var path_data = map_data.get_movement_path_data(
+		start_pos,
+		destination,
+		units[unit_index]["move"],
+		unit_query.get_all_occupied_tiles_except_unit(
+			units,
+			unit_index
+		)
+	)
+
+	if path_data.is_empty():
+		return false
+
+	var path_cells: Array[Vector2i] = path_data["path_cells"]
+	var move_distance: int = path_data["cost"]
+
+	var pending_coverage_enemies = (
+		coverage_system.get_enemies_entered_coverage_along_path(
+			units,
+			unit_logic,
+			unit_index,
+			path_cells
+		)
+	)
+
+	units[unit_index]["pos"] = destination
+
+	if coverage_system.resolve_pending_coverage_if_needed(
+		units,
+		combat_logic,
+		unit_index,
+		pending_coverage_enemies
+	):
+		return true
+
+	stamina_system.spend_movement_stamina(
+		units,
+		unit_index,
+		move_distance
+	)
+
+	return false
+
 # =========================
 # Returns the best retreat tile for
 # cautious ranged behavior.
@@ -381,7 +455,7 @@ func process_cautious_ranged_turn(
 	_movement_system,
 	_action_system,
 	combat_logic,
-	_coverage_system,
+	coverage_system,
 	stamina_system
 ):
 
@@ -434,17 +508,18 @@ func process_cautious_ranged_turn(
 			unit_logic
 		)
 
-	var move_distance = map_data.get_grid_distance(
-		start_pos,
-		destination
-	)
-
-	units[unit_index]["pos"] = destination
-	stamina_system.spend_movement_stamina(
+	if move_ai_unit(
 		units,
 		unit_index,
-		move_distance
-	)
+		destination,
+		map_data,
+		unit_logic,
+		coverage_system,
+		combat_logic,
+		stamina_system
+	):
+		units.remove_at(unit_index)
+		return
 
 	target_index = get_nearest_enemy(
 		units,
@@ -570,7 +645,7 @@ func process_barbarian_turn(
 	_movement_system,
 	_action_system,
 	combat_logic,
-	_coverage_system,
+	coverage_system,
 	stamina_system
 ):
 
@@ -595,8 +670,6 @@ func process_barbarian_turn(
 	):
 		return
 
-	var start_pos = units[unit_index]["pos"]
-
 	var destination = get_best_move_toward_target(
 		units,
 		unit_index,
@@ -604,17 +677,18 @@ func process_barbarian_turn(
 		map_data
 	)
 
-	var move_distance = map_data.get_grid_distance(
-		start_pos,
-		destination
-	)
-
-	units[unit_index]["pos"] = destination
-	stamina_system.spend_movement_stamina(
+	if move_ai_unit(
 		units,
 		unit_index,
-		move_distance
-	)
+		destination,
+		map_data,
+		unit_logic,
+		coverage_system,
+		combat_logic,
+		stamina_system
+	):
+		units.remove_at(unit_index)
+		return
 
 	target_index = get_nearest_enemy(
 		units,
@@ -715,14 +789,24 @@ func try_attack_target(
 	return true
 
 # =========================
-# Returns the nearest enemy unit index
-# relative to the given unit.
+# Returns the nearest reachable
+# enemy unit index relative to
+# the given unit.
 #
-# Distance uses grid distance only.
+# Distance uses actual traversable
+# path cost rather than direct
+# grid distance.
+#
+# This allows AI to correctly
+# navigate around:
+# - rivers
+# - walls
+# - blocked chokepoints
+# - occupied tiles
 #
 # Returns:
 # - enemy unit index
-# - or -1 if no enemies exist
+# - or -1 if no reachable enemies exist
 # =========================
 
 func get_nearest_enemy(
@@ -737,6 +821,11 @@ func get_nearest_enemy(
 	var unit_team = units[unit_index]["team"]
 	var unit_pos = units[unit_index]["pos"]
 
+	var occupied_tiles = unit_query.get_enemy_occupied_tiles(
+		units,
+		unit_index
+	)
+
 	for i in range(units.size()):
 
 		if i == unit_index:
@@ -745,10 +834,16 @@ func get_nearest_enemy(
 		if units[i]["team"] == unit_team:
 			continue
 
-		var distance = map_data.get_grid_distance(
+		var path_data = map_data.get_path_to_nearest_adjacent_tile(
 			unit_pos,
-			units[i]["pos"]
+			units[i]["pos"],
+			occupied_tiles
 		)
+
+		if path_data.is_empty():
+			continue
+
+		var distance = path_data["cost"]
 
 		if distance < best_distance:
 			best_distance = distance
@@ -848,39 +943,53 @@ func get_best_move_toward_target(
 	)
 
 	var best_tile = unit["pos"]
-	var best_distance = map_data.get_grid_distance(
-		unit["pos"],
-		target["pos"]
-	)
-	var best_alignment_score = 999999
+	var best_distance = 999999
+	var best_move_cost = 999999
 
-	var total_dx = abs(target["pos"].x - unit["pos"].x)
-	var total_dy = abs(target["pos"].y - unit["pos"].y)
+	var planning_occupied_tiles = unit_query.get_enemy_occupied_tiles(
+		units,
+		unit_index
+	)
+
+	var movement_occupied_tiles = unit_query.get_all_occupied_tiles_except_unit(
+		units,
+		unit_index
+	)
 
 	for tile in move_tiles:
 
-		var distance = map_data.get_grid_distance(
+		var path_to_target = map_data.get_path_to_nearest_adjacent_tile(
 			tile,
-			target["pos"]
+			target["pos"],
+			planning_occupied_tiles
 		)
 
-		var moved_dx = abs(tile.x - unit["pos"].x)
-		var moved_dy = abs(tile.y - unit["pos"].y)
+		if path_to_target.is_empty():
+			continue
 
-		var alignment_score = abs(
-			(moved_dx * total_dy)
-			- (moved_dy * total_dx)
+		var distance_to_target = path_to_target["cost"]
+
+		var path_from_start = map_data.get_movement_path_data(
+			unit["pos"],
+			tile,
+			unit["move"],
+			movement_occupied_tiles
 		)
+
+		if path_from_start.is_empty():
+			continue
+
+		var move_cost = path_from_start["cost"]
 
 		if (
-			distance < best_distance
+			distance_to_target < best_distance
 			or (
-				distance == best_distance
-				and alignment_score < best_alignment_score
+				distance_to_target == best_distance
+				and move_cost < best_move_cost
 			)
 		):
-			best_distance = distance
-			best_alignment_score = alignment_score
+			best_distance = distance_to_target
+			best_move_cost = move_cost
 			best_tile = tile
 
 	return best_tile
@@ -951,7 +1060,7 @@ func process_defender_turn(
 	_movement_system,
 	_action_system,
 	combat_logic,
-	_coverage_system,
+	coverage_system,
 	stamina_system
 ):
 
@@ -1013,8 +1122,6 @@ func process_defender_turn(
 	):
 		return
 
-	var start_pos = units[unit_index]["pos"]
-
 	var destination = get_best_defender_tile(
 		units,
 		unit_index,
@@ -1023,18 +1130,18 @@ func process_defender_turn(
 		unit_logic
 	)
 
-	var move_distance = map_data.get_grid_distance(
-		start_pos,
-		destination
-	)
-
-	units[unit_index]["pos"] = destination
-
-	stamina_system.spend_movement_stamina(
+	if move_ai_unit(
 		units,
 		unit_index,
-		move_distance
-	)
+		destination,
+		map_data,
+		unit_logic,
+		coverage_system,
+		combat_logic,
+		stamina_system
+	):
+		units.remove_at(unit_index)
+		return
 
 	target_index = get_nearest_enemy_inside_defender_leash(
 		units,
@@ -1252,7 +1359,7 @@ func process_support_healer_turn(
 	_movement_system,
 	_action_system,
 	combat_logic,
-	_coverage_system,
+	coverage_system,
 	stamina_system
 ):
 
@@ -1275,8 +1382,6 @@ func process_support_healer_turn(
 		):
 			return
 
-		var start_pos = units[unit_index]["pos"]
-
 		var destination = get_best_healer_approach_tile(
 			units,
 			unit_index,
@@ -1285,18 +1390,18 @@ func process_support_healer_turn(
 			unit_logic
 		)
 
-		var move_distance = map_data.get_grid_distance(
-			start_pos,
-			destination
-		)
-
-		units[unit_index]["pos"] = destination
-
-		stamina_system.spend_movement_stamina(
+		if move_ai_unit(
 			units,
 			unit_index,
-			move_distance
-		)
+			destination,
+			map_data,
+			unit_logic,
+			coverage_system,
+			combat_logic,
+			stamina_system
+		):
+			units.remove_at(unit_index)
+			return
 
 		heal_target_index = get_best_heal_target(
 			units,

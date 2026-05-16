@@ -39,7 +39,8 @@ func spend_movement_stamina(
 # Spends stamina when a unit attacks.
 #
 # Archer special rule:
-# - firing consumes all remaining stamina
+# - stamina spent is based on
+#   current projected damage
 #
 # Other classes:
 # - spend their attack stamina cost
@@ -54,7 +55,27 @@ func spend_attack_stamina(
 		return
 
 	if units[unit_index]["class"] == "archer":
-		units[unit_index]["stamina"] = 0
+
+		var attack_damage = min(
+			units[unit_index]["attack"],
+			int(floor(
+				float(units[unit_index]["stamina"])
+				/ float(units[unit_index]["stamina_per_damage"])
+			))
+		)
+
+		attack_damage = max(attack_damage, 1)
+
+		var stamina_cost = (
+			attack_damage
+			* units[unit_index]["stamina_per_damage"]
+		)
+
+		units[unit_index]["stamina"] = max(
+			units[unit_index]["stamina"] - stamina_cost,
+			0
+		)
+
 		return
 
 	units[unit_index]["stamina"] = max(

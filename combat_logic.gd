@@ -18,7 +18,7 @@ extends Node
 # Returns final attack damage.
 #
 # Handles:
-# - archer movement scaling
+# - archer stamina-based scaling
 # - counter/reaction multipliers
 #
 # Does NOT apply damage.
@@ -33,22 +33,15 @@ func get_attack_damage(
 
 	if attacker["class"] == "archer":
 
-		var spent_stamina = (
-			attacker["max_stamina"]
-			- attacker["stamina"]
+		damage = min(
+			attacker["attack"],
+			int(floor(
+				float(attacker["stamina"])
+				/ float(attacker["stamina_per_damage"])
+			))
 		)
 
-		var moved_tiles = int(round(
-			float(spent_stamina)
-			/ float(attacker["move_stamina_cost"])
-		))
-
-		var move_damage_penalty = attacker["move_damage_penalty"]
-
-		damage = max(
-			attacker["attack"] - moved_tiles * move_damage_penalty,
-			1
-		)
+		damage = max(damage, 1)
 
 	return int(round(damage * damage_multiplier))
 

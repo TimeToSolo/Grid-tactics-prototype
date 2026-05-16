@@ -17,7 +17,9 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 - Directional coverage/interception zones
 - Stamina-based reaction attacks
 - Delayed coverage reactions after movement confirmation
+- Coverage reactions calculated from actual traversed movement paths
 - Movement stamina costs
+- Modular support-action system
 - Attack, heal, regeneration, wait, and facing confirmation flow
 - Auto-end turn when all units on the active team are exhausted
 - Multi-team turn support (`player`, `enemy`, `neutral`, etc.)
@@ -49,6 +51,7 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 - Ranged attack validation
 - Healing charge system
 - Regeneration support
+- Modular support-action architecture
 - Directional interception
 - Formation pressure
 - Chokepoint gameplay
@@ -56,6 +59,7 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 - Coverage-based positional control
 - Territorial AI leash systems
 - Home-position defensive behavior
+- Path-based interception detection
 
 ## AI Systems
 
@@ -101,6 +105,7 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 - Area drag movement
 - Live leash-range previews
 - Global defender territory debug overlay (`F7`)
+- Persistent defender home/leash serialization
 
 ## UI Features
 
@@ -234,3 +239,6 @@ Recent development has focused heavily on:
 - editor workflow improvements
 - scalable tactical systems
 - debugging and visualization tools
+- movement/path refactoring
+- modular action/support systems
+- codebase cleanup and system normalization

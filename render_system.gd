@@ -683,6 +683,194 @@ func draw_heal_confirmation_prompt(
 		Color.WHITE
 	)
 
+# =========================
+# Draws compact hover info
+# for the unit under cursor.
+#
+# Shows:
+# - class name
+# - HP / stamina labels
+# - HP / stamina bars
+# - numeric HP / stamina values
+#
+# HP bar:
+# - primary resource
+# - larger and more prominent
+#
+# Stamina bar:
+# - secondary tactical resource
+# - thinner and more subtle
+# =========================
+
+func draw_hover_unit_panel(
+	canvas,
+	units: Array,
+	unit_query,
+	hovered_cell: Vector2i,
+	inspected_unit: int,
+	selected_unit: int
+):
+
+	var display_unit = unit_query.get_unit_at(
+		units,
+		hovered_cell
+	)
+
+	if display_unit == -1:
+		display_unit = inspected_unit
+
+	if display_unit == -1:
+		display_unit = selected_unit
+
+	if display_unit == -1:
+		return
+
+	if display_unit < 0 or display_unit >= units.size():
+		return
+
+	var unit = units[display_unit]
+
+	var panel_pos = Vector2(16, 16)
+	var panel_size = Vector2(380, 112)
+	var panel_rect = Rect2(panel_pos, panel_size)
+
+	var font = ThemeDB.fallback_font
+
+	canvas.draw_rect(
+		panel_rect,
+		Color(0.04, 0.045, 0.05, 0.95),
+		true
+	)
+
+	canvas.draw_rect(
+		panel_rect,
+		Color(0.72, 0.66, 0.42, 1.0),
+		false,
+		2.0
+	)
+
+	var label_x = panel_pos.x + 24
+	var bar_x = panel_pos.x + 105
+	var hp_y = panel_pos.y + 56
+	var stamina_y = panel_pos.y + 86
+
+	var hp_bar_size = Vector2(235, 22)
+	var stamina_bar_size = Vector2(150, 12)
+
+	var value_x = panel_pos.x + 285
+
+	canvas.draw_string(
+		font,
+		panel_pos + Vector2(24, 40),
+		unit["class"].capitalize(),
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		32,
+		Color.WHITE
+	)
+
+	var hp_text = str(unit["hp"]) + "/" + str(unit["max_hp"])
+
+	canvas.draw_string(
+		font,
+		Vector2(value_x, panel_pos.y + 44),
+		hp_text,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		26,
+		Color(0.85, 1.0, 0.85)
+	)
+
+	canvas.draw_string(
+		font,
+		Vector2(label_x, hp_y + 20),
+		"HP",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		22,
+		Color.WHITE
+	)
+
+	var hp_bar_pos = Vector2(bar_x, hp_y)
+
+	var hp_percent = float(unit["hp"]) / float(unit["max_hp"])
+	var hp_fill_width = hp_bar_size.x * hp_percent
+
+	var hp_fill_color = Color(0.2, 0.85, 0.2)
+
+	if unit["team"] == "enemy":
+		hp_fill_color = Color(0.85, 0.2, 0.2)
+
+	canvas.draw_rect(
+		Rect2(hp_bar_pos, hp_bar_size),
+		Color(0.12, 0.12, 0.12),
+		true
+	)
+
+	canvas.draw_rect(
+		Rect2(
+			hp_bar_pos,
+			Vector2(hp_fill_width, hp_bar_size.y)
+		),
+		hp_fill_color,
+		true
+	)
+
+	canvas.draw_rect(
+		Rect2(hp_bar_pos, hp_bar_size),
+		Color.BLACK,
+		false,
+		2.0
+	)
+
+	canvas.draw_string(
+		font,
+		Vector2(label_x, stamina_y + 14),
+		"STA",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		18,
+		Color.WHITE
+	)
+
+	var stamina_bar_pos = Vector2(bar_x, stamina_y)
+
+	var stamina_percent = float(unit["stamina"]) / float(unit["max_stamina"])
+	var stamina_fill_width = stamina_bar_size.x * stamina_percent
+
+	canvas.draw_rect(
+		Rect2(stamina_bar_pos, stamina_bar_size),
+		Color(0.12, 0.10, 0.06),
+		true
+	)
+
+	canvas.draw_rect(
+		Rect2(
+			stamina_bar_pos,
+			Vector2(stamina_fill_width, stamina_bar_size.y)
+		),
+		Color(0.95, 0.65, 0.18),
+		true
+	)
+
+	canvas.draw_rect(
+		Rect2(stamina_bar_pos, stamina_bar_size),
+		Color.BLACK,
+		false,
+		1.0
+	)
+
+	var stamina_text = str(unit["stamina"]) + "/" + str(unit["max_stamina"])
+
+	canvas.draw_string(
+		font,
+		Vector2(value_x - 25, stamina_y + 14),
+		stamina_text,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		20,
+		Color(1.0, 0.9, 0.55)
+	)
 
 # =========================
 # Draws hover preview for attack targets.

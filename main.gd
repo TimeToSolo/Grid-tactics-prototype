@@ -1131,6 +1131,29 @@ func _draw():
 	draw_editor_ui()
 	draw_editor_resize_ui()
 
+	var inspected_unit_index = -1
+
+	if inspected_unit_id != -1:
+		inspected_unit_index = unit_query.get_unit_index_by_id(
+			units,
+			inspected_unit_id
+		)
+
+	if (
+		not editor_mode
+		and not awaiting_attack_confirmation
+		and not awaiting_support_confirmation
+		and not awaiting_wait_confirmation
+	):
+		render_system.draw_hover_unit_panel(
+			self,
+			units,
+			unit_query,
+			hovered_cell,
+			inspected_unit_index,
+			selected_unit
+		)
+
 # =========================
 # Draws all defender leash
 # zones while debug overlay

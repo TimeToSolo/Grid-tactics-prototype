@@ -21,6 +21,48 @@ var current_team_index := 0
 var current_team: String = team_order[current_team_index]
 
 # ==================================================
+# DIFFICULTY SETTINGS
+# ==================================================
+
+enum Difficulty {
+	CASUAL,
+	NORMAL,
+	HARD
+}
+
+var current_difficulty := Difficulty.NORMAL
+
+# =========================
+# Returns stamina recovery
+# amount based on:
+# - difficulty
+# - active team
+# =========================
+
+func get_stamina_refresh(team: String) -> int:
+
+	match current_difficulty:
+
+		Difficulty.CASUAL:
+
+			if team == "player":
+				return 100
+
+			return 80
+
+		Difficulty.NORMAL:
+			return 80
+
+		Difficulty.HARD:
+
+			if team == "player":
+				return 70
+
+			return 90
+
+	return 80
+
+# ==================================================
 # TURN FLOW
 # ==================================================
 
@@ -41,7 +83,8 @@ func end_turn(units: Array):
 # Refreshes units at the start of a team's turn.
 #
 # Refresh includes:
-# - restoring stamina
+# - restoring action state
+# - recovering stamina
 # - applying regeneration healing
 # =========================
 
@@ -57,7 +100,13 @@ func refresh_team_units(
 
 		unit["has_acted"] = false
 		unit["reaction_used"] = false
-		unit["stamina"] = unit["max_stamina"]
+
+		var stamina_refresh = get_stamina_refresh(team)
+
+		unit["stamina"] = min(
+			unit["stamina"] + stamina_refresh,
+			unit["max_stamina"]
+		)
 
 		apply_regen_if_active(unit)
 

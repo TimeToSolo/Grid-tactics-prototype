@@ -2,9 +2,25 @@
 
 Turn-based tactical combat prototype built in Godot using GDScript.
 
-This project explores tactical combat centered around movement, facing, stamina, directional coverage, territorial control, and battlefield pressure. The goal is to create battles where positioning matters before attacks happen, defensive lines can hold or collapse, and movement itself creates tactical vulnerability.
+This project explores tactical combat centered around movement, facing, stamina, directional coverage, territorial control, battlefield pressure, terrain-aware navigation, and formation-based engagements.
 
-Rather than focusing on raw stat trading, the prototype emphasizes formation integrity, controlled advances, retreat pressure, lane denial, territorial defense, and readable battlefield threat.
+The goal is to create battles where:
+- positioning matters before attacks happen
+- terrain shapes battlefield flow
+- defensive lines can hold or collapse
+- movement itself creates tactical vulnerability
+- chokepoints and navigation matter tactically
+- AI behaves consistently within terrain constraints
+
+Rather than focusing on raw stat trading, the prototype emphasizes:
+- formation integrity
+- controlled advances
+- retreat pressure
+- lane denial
+- territorial defense
+- readable battlefield threat
+- terrain-aware tactical positioning
+- navigable battlefield control
 
 ---
 
@@ -19,6 +35,7 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 - Delayed coverage reactions after movement confirmation
 - Coverage reactions calculated from actual traversed movement paths
 - Movement stamina costs
+- Difficulty-scaled stamina recovery
 - Modular support-action system
 - Attack, heal, regeneration, wait, and facing confirmation flow
 - Auto-end turn when all units on the active team are exhausted
@@ -33,6 +50,12 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 - Dangerous path tiles highlighted before movement confirmation
 - Coverage reactions calculated from actual movement path traversal
 - Deterministic pathfinding behavior for debugging and testing
+- Terrain-aware AI pathfinding
+- Traversable path-cost AI targeting
+- River and wall-aware navigation
+- AI path evaluation using actual reachable routes
+- Traffic-aware movement handling
+- Chokepoint-aware movement behavior
 
 ## Unit Types
 
@@ -60,6 +83,9 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 - Territorial AI leash systems
 - Home-position defensive behavior
 - Path-based interception detection
+- Terrain-driven engagement flow
+- Bridge and lane-control gameplay
+- Stamina-driven battlefield pacing
 
 ## AI Systems
 
@@ -68,15 +94,25 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 - Mixed AI behaviors supported within the same faction
 - Territory-aware defensive AI
 - Data-driven AI profile system
+- Terrain-aware enemy navigation
+- Path-cost target evaluation
+- Coverage-aware movement resolution
+- Shared AI movement helper system
+- Ranged positioning AI
+- Support/healer AI
+- Terrain-aware ranged movement evaluation
+- Reachable-target attack positioning
 
 ### Current AI Profiles
 
 #### Barbarian
 
-- Aggressively pursues nearest enemy
+- Aggressively pursues nearest reachable enemy
+- Uses traversable path cost instead of raw grid distance
 - Attacks whenever possible
 - Ignores coverage danger
-- Respects movement/facing restrictions
+- Respects terrain/pathing restrictions
+- Uses actual navigable routes
 
 #### Defender
 
@@ -86,6 +122,25 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 - Returns home when enemies leave territory
 - Restores original facing direction while idle
 - Never chases endlessly across the map
+- Uses terrain-aware movement evaluation
+
+#### Cautious Ranged
+
+- Maintains preferred attack distance
+- Attempts to avoid direct frontline engagement
+- Uses terrain-aware pathfinding
+- Prioritizes reachable attack positions
+- Repositions before attacking when possible
+- Uses actual traversable routes for movement evaluation
+
+#### Support Healer
+
+- Prioritizes injured allies
+- Uses heal charges strategically
+- Searches for reachable healing positions
+- Uses terrain-aware navigation
+- Avoids unnecessary frontline exposure
+- Falls back to movement behavior when no healing target exists
 
 ## Editor Features
 
@@ -106,6 +161,7 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 - Live leash-range previews
 - Global defender territory debug overlay (`F7`)
 - Persistent defender home/leash serialization
+- Rapid tutorial-map prototyping workflow
 
 ## UI Features
 
@@ -121,6 +177,11 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 - Threat range inspection for enemy units
 - Defender territory overlays
 - Live movement destination previews
+- Hover-based unit inspection panel
+- Compact HP/stamina battlefield UI
+- Real-time hovered unit display
+- Selected enemy threat inspection UI
+- Terrain-combat readability improvements
 
 ---
 
@@ -129,6 +190,7 @@ Rather than focusing on raw stat trading, the prototype emphasizes formation int
 This prototype is focused on creating tactical battles where:
 
 - movement creates vulnerability
+- terrain shapes tactical decisions
 - defensive lines matter
 - stamina limits repeated reactions
 - formations naturally emerge from play
@@ -138,32 +200,20 @@ This prototype is focused on creating tactical battles where:
 - AI behaviors create faction identity
 - territory ownership influences combat flow
 - positioning matters before attacks happen
+- navigable routes matter more than geometric proximity
+- chokepoints create meaningful tactical pressure
 
 The combat system draws inspiration from tactical RPGs and strategy games, but replaces unlimited counterattacks with stamina-limited directional coverage and reaction systems.
 
-The long-term goal is to create battles that feel readable, positional, pressure-driven, and tactically expressive rather than purely statistical.
+The long-term goal is to create battles that feel:
+- readable
+- positional
+- pressure-driven
+- terrain-aware
+- tactically expressive
+- formation-focused
 
----
-
-# Controls
-
-| Input | Action |
-|---|---|
-| Left Click | Select / Move / Choose target |
-| Right Click | Cancel / Deselect |
-| W | Confirm Wait |
-| Y | Confirm Attack |
-| H | Confirm Heal |
-| R | Confirm Regeneration |
-| N | Cancel Action |
-| T | End Turn |
-| C | Toggle Coverage Display |
-| F | Rotate Editor Facing |
-| A | Cycle Editor AI Profile |
-| TAB | Cycle Editor Palette |
-| M | Resize Map |
-| F7 | Toggle Defender Territory Overlay |
-| +/- | Adjust Selected Defender Leash |
+rather than purely statistical.
 
 ---
 
@@ -181,6 +231,9 @@ The long-term goal is to create battles that feel readable, positional, pressure
 - Multi-layer territory ownership
 - Reinforcement behaviors
 - AI coordination systems
+- Safe-path evaluation
+- Terrain-preference AI
+- Coverage-avoidance logic
 
 ## Tactical Systems
 
@@ -193,37 +246,9 @@ The long-term goal is to create battles that feel readable, positional, pressure
 - Ambush and stealth systems
 - Patrol routes
 - Dynamic defensive lines
-
-## Presentation
-
-- Camera controls
-- Larger maps
-- Combat animations
-- Better UI polish
-- Sound and visual feedback
-- Scenario progression
-- Environmental effects
-
----
-
-# Tech
-
-- Engine: Godot
-- Language: GDScript
-
----
-
-# Repository Goals
-
-This repository is being used to:
-
-- learn Git and GitHub workflow
-- prototype tactical combat systems
-- experiment with battlefield-control mechanics
-- explore AI behavior design
-- build a long-term portfolio project
-- develop scalable tactical architecture
-- explore territory-based AI systems
+- Engineer/barricade systems
+- Destructible battlefield fortifications
+- Temporary deployable terrain
 
 ---
 
@@ -231,14 +256,21 @@ This repository is being used to:
 
 Early prototype / active development.
 
-Systems, balance, AI behavior, editor tooling, and map design are experimental and subject to change as the tactical framework evolves.
+Systems, balance, AI behavior, editor tooling, map design, and tactical pacing are experimental and subject to change as the tactical framework evolves.
 
 Recent development has focused heavily on:
+- terrain-aware pathfinding
 - modular AI architecture
 - territory-aware defender behavior
+- tactical readability
+- hover/inspection UI systems
 - editor workflow improvements
 - scalable tactical systems
 - debugging and visualization tools
+- ranged/support AI behaviors
+- AI terrain-aware targeting
 - movement/path refactoring
 - modular action/support systems
+- coverage path traversal logic
+- tutorial encounter design
 - codebase cleanup and system normalization

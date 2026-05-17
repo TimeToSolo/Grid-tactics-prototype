@@ -647,7 +647,7 @@ func draw_unit_facing(
 	)
 
 # ==================================================
-# UI PROMPTS / HOVER PREVIEW
+# HOVER PREVIEW
 # ==================================================
 
 # =========================
@@ -680,75 +680,6 @@ func draw_turn_indicator(
 		-1,
 		20,
 		turn_color
-	)
-
-
-# =========================
-# Draws wait confirmation prompt.
-# =========================
-
-func draw_wait_confirmation_prompt(
-	canvas: CanvasItem,
-	awaiting_wait_confirmation: bool
-):
-
-	if not awaiting_wait_confirmation:
-		return
-
-	canvas.draw_string(
-		ThemeDB.fallback_font,
-		Vector2(430, 74),
-		"Attack? Y/N",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		24,
-		Color.WHITE
-	)
-
-
-# =========================
-# Draws attack confirmation prompt.
-# =========================
-
-func draw_attack_confirmation_prompt(
-	canvas: CanvasItem,
-	awaiting_attack_confirmation: bool
-):
-
-	if not awaiting_attack_confirmation:
-		return
-
-	canvas.draw_string(
-		ThemeDB.fallback_font,
-		Vector2(420, 69),
-		"Attack? Y/N",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		24,
-		Color.WHITE
-	)
-
-
-# =========================
-# Draws heal confirmation prompt.
-# =========================
-
-func draw_heal_confirmation_prompt(
-	canvas: CanvasItem,
-	awaiting_heal_confirmation: bool
-):
-
-	if not awaiting_heal_confirmation:
-		return
-
-	canvas.draw_string(
-		ThemeDB.fallback_font,
-		Vector2(260, 30),
-		"Heal: H / Regen: R / Cancel: N",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		20,
-		Color.WHITE
 	)
 
 # =========================

@@ -74,6 +74,7 @@ extends Node2D
 @onready var hover_unit_panel = $CanvasLayer/HoverUnitPanel
 @onready var hover_unit_name_label = $CanvasLayer/HoverUnitPanel/UnitNameLabel
 @onready var hover_hp_value_label = $CanvasLayer/HoverUnitPanel/HPValueLabel
+@onready var hover_hp_back_bar = $CanvasLayer/HoverUnitPanel/HPBackBar
 @onready var hover_hp_bar = $CanvasLayer/HoverUnitPanel/HPBar
 @onready var hover_hp_preview_bar = $CanvasLayer/HoverUnitPanel/HPPreviewBar
 @onready var hover_stamina_value_label = $CanvasLayer/HoverUnitPanel/StaminaValueLabel
@@ -138,6 +139,21 @@ var hover_path_cells: Array[Vector2i] = []
 # Currently inspected non-active unit ID.
 var inspected_unit_id := -1
 
+# Keyboard/grid cursor position.
+#
+# Used by WASD/arrow movement so the
+# cursor snaps between grid cells.
+var keyboard_cursor_cell: Vector2i = Vector2i(-1, -1)
+
+# True after keyboard cursor has been initialized.
+var keyboard_cursor_active := false
+
+# Last mouse-hovered grid cell.
+#
+# Used to detect real mouse movement
+# without disabling keyboard cursor every frame.
+var last_mouse_hover_cell: Vector2i = Vector2i(-1, -1)
+
 # ==================================================
 # ACTION MENU STATE
 # ==================================================
@@ -166,6 +182,13 @@ var action_menu_mode := ""
 
 # Facing tile chosen during a confirmation menu.
 var pending_facing_cell: Vector2i = Vector2i(-1, -1)
+
+# How the action menu was confirmed.
+# "keyboard" or "mouse"
+var action_menu_confirm_source := "keyboard"
+
+# True while player input is disabled.
+var input_locked := false
 
 # ==================================================
 # LEVEL EDITOR STATE
@@ -1093,6 +1116,8 @@ func _draw():
 		has_pending_move()
 	)
 
+	draw_cursor_preview()
+
 	if not action_menu_visible:
 		render_system.draw_facing_choice_tiles(
 			self,
@@ -1199,23 +1224,6 @@ func _draw():
 		has_pending_move()
 	)
 
-	if not action_menu_visible:
-
-		render_system.draw_wait_confirmation_prompt(
-			self,
-			awaiting_wait_confirmation
-		)
-
-		render_system.draw_attack_confirmation_prompt(
-			self,
-			awaiting_attack_confirmation
-		)
-
-		render_system.draw_heal_confirmation_prompt(
-			self,
-			awaiting_support_confirmation
-		)
-
 	draw_editor_rect_preview()
 	draw_editor_select_drag_preview()
 	draw_editor_selected_area()
@@ -1225,6 +1233,8 @@ func _draw():
 	draw_editor_move_preview()
 	draw_editor_ui()
 	draw_editor_resize_ui()
+
+
 
 # =========================
 # Draws all defender leash
@@ -1449,6 +1459,50 @@ func draw_inspected_unit_threat_range():
 		)
 
 # =========================
+# Draws cursor hover tile.
+#
+# White = empty tile
+# Blue = allied unit
+# Red = enemy unit
+# =========================
+
+func draw_cursor_preview():
+
+	if editor_mode:
+		return
+
+	if hovered_cell == Vector2i(-1, -1):
+		return
+
+	if not map_data.is_inside_grid(hovered_cell):
+		return
+
+	var border_color = Color.WHITE
+	var border_width = 5
+
+	var hovered_unit = unit_query.get_unit_at(
+		units,
+		hovered_cell
+	)
+
+	if hovered_unit != -1:
+
+		if units[hovered_unit]["team"] == "player":
+			border_color = Color(0.5, 0.9, 1.0)
+			border_width = 10
+
+		else:
+			border_color = Color(1.0, 0.55, 0.55)
+			border_width = 10
+
+	draw_rect(
+		map_data.grid_rect(hovered_cell),
+		border_color,
+		false,
+		border_width
+	)
+
+# =========================
 # Updates hover unit UI panel.
 # =========================
 
@@ -1567,11 +1621,15 @@ func update_hover_unit_panel():
 	var hp_bar_pos = Vector2(105, 56)
 	var hp_bar_size = Vector2(235, 22)
 
-	var hp_percent = float(unit["hp"]) / float(unit["max_hp"])
+	var hp_percent = float(preview_hp) / float(unit["max_hp"])
 	var hp_fill_width = hp_bar_size.x * hp_percent
 
-	var preview_percent = float(preview_hp) / float(unit["max_hp"])
-	var preview_fill_width = hp_bar_size.x * preview_percent
+	var current_percent = float(unit["hp"]) / float(unit["max_hp"])
+	var current_fill_width = hp_bar_size.x * current_percent
+
+	hover_hp_back_bar.position = hp_bar_pos
+	hover_hp_back_bar.size = hp_bar_size
+	hover_hp_back_bar.color = Color(0.12, 0.12, 0.12, 1.0)
 
 	hover_hp_bar.position = hp_bar_pos
 	hover_hp_bar.size = Vector2(hp_fill_width, hp_bar_size.y)
@@ -1581,12 +1639,12 @@ func update_hover_unit_panel():
 	else:
 		hover_hp_bar.color = Color(0.2, 0.85, 0.2)
 
-	var damage_width = hp_fill_width - preview_fill_width
+	var damage_width = current_fill_width - hp_fill_width
 
 	if preview_damage > 0 and damage_width > 0:
 		hover_hp_preview_bar.visible = true
 		hover_hp_preview_bar.position = Vector2(
-			hp_bar_pos.x + preview_fill_width,
+			hp_bar_pos.x + hp_fill_width,
 			hp_bar_pos.y
 		)
 		hover_hp_preview_bar.size = Vector2(damage_width, hp_bar_size.y)
@@ -1930,6 +1988,7 @@ func handle_action_menu_input(event):
 			cancel_action_menu_step()
 
 		KEY_Z:
+			action_menu_confirm_source = "keyboard"
 			confirm_action_menu_selection()
 
 		KEY_ESCAPE:
@@ -2020,7 +2079,28 @@ func confirm_action_menu_selection():
 
 		"Move":
 			action_menu_visible = false
-			awaiting_facing_selection = true
+			awaiting_facing_selection = false
+
+			if action_menu_confirm_source == "mouse":
+
+				if action_menu_confirm_source == "mouse":
+
+					var mouse_cell = map_data.world_to_grid(
+						get_viewport().get_mouse_position()
+					)
+
+					if map_data.is_inside_grid(mouse_cell):
+						hovered_cell = mouse_cell
+						keyboard_cursor_cell = mouse_cell
+						keyboard_cursor_active = false
+
+					queue_redraw()
+					return
+
+			keyboard_cursor_cell = pending_move_cell
+			keyboard_cursor_active = true
+			hovered_cell = keyboard_cursor_cell
+
 			queue_redraw()
 
 		"Cancel":
@@ -2060,17 +2140,20 @@ func start_battle_flow():
 		unit["has_acted"] = false
 
 	clear_selection()
-
+	initialize_keyboard_cursor()
 	queue_redraw()
 
 	await show_phase_popup("Battle Commence")
 	await show_phase_popup()
 
 
+# =========================
+# Initial setup.
+# =========================
+
 func _ready():
 
 	phase_popup.visible = false
-	action_menu.visible = false
 
 	if FileAccess.file_exists(get_editor_map_path()):
 
@@ -2084,15 +2167,12 @@ func _ready():
 	else:
 
 		map_data.normalize_terrain_rows()
-		units = battle_setup.create_battle_units(unit_data)
 
-	turn_number = 1
-	turn_manager.current_team = "player"
+		units = battle_setup.create_battle_units(
+			unit_data
+		)
 
-	for unit in units:
-		unit["has_acted"] = false
-
-	clear_selection()
+	initialize_keyboard_cursor()
 
 	queue_redraw()
 
@@ -2102,7 +2182,21 @@ func _ready():
 
 func _process(_delta):
 
+	if input_locked:
+		update_action_menu()
+		queue_redraw()
+		return
+
 	var mouse_pos = get_viewport().get_mouse_position()
+
+	var mouse_hover_cell = map_data.world_to_grid(mouse_pos)
+
+	if last_mouse_hover_cell == Vector2i(-1, -1):
+		last_mouse_hover_cell = mouse_hover_cell
+
+	if mouse_hover_cell != last_mouse_hover_cell:
+		keyboard_cursor_active = false
+		last_mouse_hover_cell = mouse_hover_cell
 
 	var suppress_map_hover = (
 		action_menu_visible
@@ -2116,9 +2210,11 @@ func _process(_delta):
 
 	if suppress_map_hover:
 		hovered_cell = Vector2i(-1, -1)
-		hover_path_cells.clear()
 	else:
-		hovered_cell = map_data.world_to_grid(mouse_pos)
+		if keyboard_cursor_active:
+			hovered_cell = keyboard_cursor_cell
+		else:
+			hovered_cell = map_data.world_to_grid(mouse_pos)
 
 	update_hover_unit_panel()
 	update_action_menu()
@@ -2197,6 +2293,9 @@ func _input(event):
 
 func handle_keyboard_input(event):
 
+	if input_locked:
+		return
+
 	if not event is InputEventKey:
 		return
 
@@ -2214,6 +2313,27 @@ func handle_keyboard_input(event):
 	if editor_resize_mode:
 		handle_editor_resize_input(event)
 		return
+
+	match event.keycode:
+
+		KEY_UP, KEY_W:
+			move_keyboard_cursor(Vector2i.UP)
+			return
+
+		KEY_LEFT, KEY_A:
+			move_keyboard_cursor(Vector2i.LEFT)
+			return
+
+		KEY_DOWN, KEY_S:
+			move_keyboard_cursor(Vector2i.DOWN)
+			return
+
+		KEY_RIGHT, KEY_D:
+			move_keyboard_cursor(Vector2i.RIGHT)
+			return
+
+		KEY_Z:
+			handle_keyboard_confirm()
 
 	match event.keycode:
 
@@ -2250,7 +2370,10 @@ func handle_keyboard_input(event):
 				load_editor_map()
 
 		KEY_TAB:
-			cycle_editor_palette()
+			if editor_mode:
+				cycle_editor_palette()
+			else:
+				jump_to_next_unmoved_ally()
 
 		KEY_BRACKETLEFT:
 			if editor_mode:
@@ -2335,18 +2458,6 @@ func handle_keyboard_input(event):
 
 		KEY_T:
 			end_current_turn()
-
-		KEY_W:
-			handle_wait_hotkey()
-
-		KEY_Y:
-			handle_attack_confirm_hotkey()
-
-		KEY_H:
-			handle_heal_hotkey()
-
-		KEY_R:
-			handle_regen_hotkey()
 
 		KEY_X:
 			cancel_pending_action()
@@ -2497,6 +2608,9 @@ func cancel_pending_action():
 
 func handle_mouse_input(event):
 
+	if input_locked:
+		return
+
 	if not event is InputEventMouseButton:
 		return
 
@@ -2508,9 +2622,16 @@ func handle_mouse_input(event):
 
 			if hovered_menu_index != -1:
 				action_menu_index = hovered_menu_index
+				action_menu_confirm_source = "mouse"
 				confirm_action_menu_selection()
 
 			return
+
+		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+			cancel_action_menu_step()
+			return
+
+		return
 
 	# =========================
 	# Right click behavior
@@ -2898,22 +3019,32 @@ func handle_left_click():
 			queue_redraw()
 			return
 
-		if awaiting_facing_selection:
+		if action_query.should_handle_facing_click(
+			units,
+			selected_unit,
+			clicked_cell,
+			pending_move_cell,
+			hovered_cell,
+			has_pending_move(),
+			unit_logic,
+			unit_query,
+			hover_query,
+			map_data
+		):
+			pending_facing_cell = clicked_cell
 
-			if action_query.should_handle_facing_click(
-				units,
-				selected_unit,
-				clicked_cell,
-				pending_move_cell,
-				hovered_cell,
-				has_pending_move(),
-				unit_logic,
-				unit_query,
-				hover_query,
-				map_data
-			):
-				handle_facing_click(clicked_cell)
-				return
+			action_menu_mode = "confirm_wait"
+
+			action_menu_options = [
+				"Wait",
+				"Cancel"
+			]
+
+			action_menu_index = 0
+			action_menu_visible = true
+
+			queue_redraw()
+			return
 
 		return
 
@@ -2945,6 +3076,23 @@ func get_valid_lancer_facing_tiles() -> Array[Vector2i]:
 	)
 
 # =========================
+# Places keyboard cursor on
+# the first available player unit.
+# =========================
+
+func initialize_keyboard_cursor():
+
+	for unit in units:
+
+		if unit["team"] == "player":
+			keyboard_cursor_cell = unit["pos"]
+			keyboard_cursor_active = true
+			return
+
+	keyboard_cursor_cell = Vector2i(0, 0)
+	keyboard_cursor_active = true
+
+# =========================
 # Clears selection and pending movement state.
 # =========================
 
@@ -2970,6 +3118,51 @@ func clear_selection():
 	hover_path_cells.clear()
 
 # =========================
+# Cycles to next allied unit
+# that has not acted.
+# =========================
+
+func jump_to_next_unmoved_ally():
+
+	var valid_units: Array[int] = []
+
+	for i in range(units.size()):
+
+		if units[i]["team"] != "player":
+			continue
+
+		if units[i]["has_acted"]:
+			continue
+
+		valid_units.append(i)
+
+	if valid_units.is_empty():
+		return
+
+	var current_index := -1
+
+	for i in range(valid_units.size()):
+
+		var unit_index = valid_units[i]
+
+		if units[unit_index]["pos"] == hovered_cell:
+			current_index = i
+			break
+
+	var next_index := 0
+
+	if current_index != -1:
+		next_index = (current_index + 1) % valid_units.size()
+
+	var next_unit = valid_units[next_index]
+
+	keyboard_cursor_cell = units[next_unit]["pos"]
+	keyboard_cursor_active = true
+	hovered_cell = keyboard_cursor_cell
+
+	queue_redraw()
+
+# =========================
 # Clears pending action confirmation state.
 #
 # If a unit had visually moved, it is restored
@@ -2977,6 +3170,8 @@ func clear_selection():
 # =========================
 
 func clear_pending_action_state():
+
+	var cursor_return_cell = selected_unit_start_cell
 
 	awaiting_facing_selection = false
 
@@ -3005,7 +3200,60 @@ func clear_pending_action_state():
 	action_menu_options.clear()
 	action_menu_index = 0
 
+	if keyboard_cursor_active and cursor_return_cell != Vector2i(-1, -1):
+		keyboard_cursor_cell = cursor_return_cell
+		hovered_cell = keyboard_cursor_cell
+
 	hover_path_cells.clear()
+
+# =========================
+# Moves keyboard cursor by
+# one grid cell.
+#
+# If switching from mouse mode,
+# the current hovered cell becomes
+# the keyboard cursor starting point.
+# =========================
+
+func move_keyboard_cursor(direction: Vector2i):
+
+	if not keyboard_cursor_active:
+
+		if (
+			hovered_cell != Vector2i(-1, -1)
+			and map_data.is_inside_grid(hovered_cell)
+		):
+			keyboard_cursor_cell = hovered_cell
+		else:
+			initialize_keyboard_cursor()
+
+	keyboard_cursor_active = true
+
+	var next_cell = keyboard_cursor_cell + direction
+
+	if not map_data.is_inside_grid(next_cell):
+		return
+
+	keyboard_cursor_cell = next_cell
+	hovered_cell = keyboard_cursor_cell
+
+	queue_redraw()
+
+# =========================
+# Confirms keyboard cursor tile.
+#
+# Behaves like left-clicking the
+# currently hovered grid cell.
+# =========================
+
+func handle_keyboard_confirm():
+
+	if not keyboard_cursor_active:
+		return
+
+	hovered_cell = keyboard_cursor_cell
+
+	handle_left_click()
 
 # ==================================================
 # SELECTION / MOVEMENT FLOW
@@ -3365,6 +3613,8 @@ func start_ai_turn_if_needed():
 	if turn_manager.current_team == "player":
 		return
 
+	input_locked = true
+
 	clear_selection()
 	inspected_unit_id = -1
 
@@ -3373,6 +3623,8 @@ func start_ai_turn_if_needed():
 	await show_phase_popup()
 
 	await process_ai_turn_if_needed()
+
+	input_locked = false
 
 # =========================
 # Processes the current team's AI turn

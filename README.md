@@ -40,11 +40,14 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Difficulty-scaled stamina recovery
 - Modular support-action system
 - Attack, heal, regeneration, wait, and facing confirmation flow
+- Context-sensitive action confirmation menus
+- Mouse and keyboard tactical controls
 - Auto-end turn when all units on the active team are exhausted
 - Multi-team turn support (`player`, `enemy`, `neutral`, etc.)
 - Sequential enemy turn presentation
 - Delayed enemy action pacing
 - Attack timing synced with visible HP updates
+- Enemy-turn input locking
 
 ## Movement and Pathing
 
@@ -190,7 +193,14 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Heal range display
 - Turn indicator
 - Stamina display
-- Confirmation prompts
+- Hover-based tactical cursor
+- Mouse and keyboard cursor synchronization
+- Keyboard grid navigation (`WASD` / Arrow Keys)
+- Tactical unit cycling (`TAB`)
+- Context-sensitive action menus
+- Attack / wait / cancel nested confirmation flow
+- Hover-based attack previews
+- Real-time HP damage preview bars
 - Threat range inspection for enemy units
 - Defender territory overlays
 - Live movement destination previews
@@ -309,3 +319,8 @@ Recent development has focused heavily on:
 - future-path AI facing
 - AI/presentation layer separation
 - battlefield readability improvements
+- keyboard tactical controls
+- nested action-menu flow
+- contextual confirmation UI
+- hover-preview combat visualization
+- enemy-turn input locking

@@ -2573,11 +2573,10 @@ func get_best_archer_distance_squared_to_tile(
 # Processes the current team's AI turn
 # if the active team is not player-controlled.
 #
-# After AI actions complete:
-# - advances turn flow
-# - updates turn counter
-# - clears selection/inspection state
-# - refreshes the display
+# Enemy actions are processed with
+# short pauses between units so the
+# player can visually follow the
+# enemy phase.
 # =========================
 
 func process_ai_turn_if_needed():
@@ -2585,17 +2584,43 @@ func process_ai_turn_if_needed():
 	if turn_manager.current_team == "player":
 		return
 
-	ai_system.take_team_turn(
-		units,
-		turn_manager.current_team,
-		map_data,
-		unit_logic,
-		movement_system,
-		action_system,
-		combat_logic,
-		coverage_system,
-		stamina_system
-	)
+	var unit_ids: Array[int] = []
+
+	for unit in units:
+		if (
+			unit["team"] == turn_manager.current_team
+			and not unit["has_acted"]
+		):
+			unit_ids.append(unit["id"])
+
+	for unit_id in unit_ids:
+
+		var unit_index = unit_query.get_unit_index_by_id(
+			units,
+			unit_id
+		)
+
+		if unit_index == -1:
+			continue
+
+		if units[unit_index]["has_acted"]:
+			continue
+
+		ai_system.take_unit_turn(
+			units,
+			unit_index,
+			map_data,
+			unit_logic,
+			movement_system,
+			action_system,
+			combat_logic,
+			coverage_system,
+			stamina_system
+		)
+
+		queue_redraw()
+
+		await get_tree().create_timer(0.25).timeout
 
 	stamina_system.recover_idle_healers(
 		units,

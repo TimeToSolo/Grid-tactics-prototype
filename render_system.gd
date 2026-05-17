@@ -391,6 +391,73 @@ func draw_coverage_preview(
 				true
 			)
 
+# =========================
+# Draws coverage preview using
+# a forced facing target.
+#
+# Unlike normal hover preview,
+# this allows enemy-occupied
+# facing tiles.
+# =========================
+
+func draw_forced_coverage_preview(
+	canvas: CanvasItem,
+	map_data,
+	unit_logic,
+	units: Array,
+	selected_unit: int,
+	pending_move_cell: Vector2i,
+	facing_target_cell: Vector2i,
+	has_pending_move: bool
+):
+
+	if selected_unit == -1:
+		return
+
+	if not has_pending_move:
+		return
+
+	if facing_target_cell == Vector2i(-1, -1):
+		return
+
+	var unit_class = units[selected_unit]["class"]
+	var facing = facing_target_cell - pending_move_cell
+
+	if facing == Vector2i.ZERO:
+		return
+
+	var coverage_tiles = unit_logic.get_coverage_tiles(
+		unit_class,
+		pending_move_cell,
+		facing
+	)
+
+	if unit_class == "tank":
+
+		var slow_tiles = unit_logic.get_tank_slow_tiles(
+			pending_move_cell,
+			facing
+		)
+
+		for cell in slow_tiles:
+
+			if map_data.is_inside_grid(cell):
+
+				canvas.draw_rect(
+					map_data.grid_rect(cell),
+					Color(0.75, 0.6, 0.1, 0.45),
+					true
+				)
+
+	for cell in coverage_tiles:
+
+		if map_data.is_inside_grid(cell):
+
+			canvas.draw_rect(
+				map_data.grid_rect(cell),
+				Color(0.0, 1.0, 0.0, 0.55),
+				true
+			)
 
 # ==================================================
 # FACING DRAWING

@@ -151,16 +151,36 @@ layout_mode = 0
 [node name="StaminaBar" type="ColorRect" parent="CanvasLayer/HoverUnitPanel" unique_id=1900176411]
 layout_mode = 0
 
-[node name="ActionMenu" type="Node" parent="CanvasLayer" unique_id=466343156]
+[node name="ActionMenu" type="Control" parent="CanvasLayer" unique_id=1800556810]
+layout_mode = 3
+anchors_preset = 0
 
-[node name="VBoxContainer" type="Node" parent="CanvasLayer/ActionMenu" unique_id=488006178]
+[node name="ActionPanel" type="Panel" parent="CanvasLayer/ActionMenu" unique_id=928297272]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
 
-[node name="MoveOptionLabel" type="Node" parent="CanvasLayer/ActionMenu/VBoxContainer" unique_id=1427287025]
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/ActionMenu/ActionPanel" unique_id=1699692577]
+layout_mode = 0
+offset_right = 1.0
+offset_bottom = 186.0
 
-[node name="AttackOptionLabel" type="Node" parent="CanvasLayer/ActionMenu/VBoxContainer" unique_id=775648445]
+[node name="MoveOptionLabel" type="Label" parent="CanvasLayer/ActionMenu/ActionPanel/VBoxContainer" unique_id=295121930]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
 
-[node name="HealOptionLabel" type="Node" parent="CanvasLayer/ActionMenu/VBoxContainer" unique_id=825991601]
+[node name="AttackOptionLabel" type="Label" parent="CanvasLayer/ActionMenu/ActionPanel/VBoxContainer" unique_id=1253039814]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
 
-[node name="ItemOptionLabel" type="Node" parent="CanvasLayer/ActionMenu/VBoxContainer" unique_id=1258006430]
+[node name="HealOptionLabel" type="Label" parent="CanvasLayer/ActionMenu/ActionPanel/VBoxContainer" unique_id=809378440]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
 
-[node name="WaitOptionLabel" type="Node" parent="CanvasLayer/ActionMenu/VBoxContainer" unique_id=1038780773]
+[node name="WaitOptionLabel" type="Label" parent="CanvasLayer/ActionMenu/ActionPanel/VBoxContainer" unique_id=1247600974]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="ItemOptionLabel" type="Label" parent="CanvasLayer/ActionMenu/ActionPanel/VBoxContainer" unique_id=1899572451]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24

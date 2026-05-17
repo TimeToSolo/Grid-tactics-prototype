@@ -67,6 +67,26 @@ extends Node2D
 @onready var selection_state = $Systems/SelectionState
 @onready var selection_system = $Systems/SelectionSystem
 
+# =========================
+# UI
+# =========================
+
+@onready var hover_unit_panel = $CanvasLayer/HoverUnitPanel
+@onready var hover_unit_name_label = $CanvasLayer/HoverUnitPanel/UnitNameLabel
+@onready var hover_hp_value_label = $CanvasLayer/HoverUnitPanel/HPValueLabel
+@onready var hover_hp_bar = $CanvasLayer/HoverUnitPanel/HPBar
+@onready var hover_hp_preview_bar = $CanvasLayer/HoverUnitPanel/HPPreviewBar
+@onready var hover_stamina_value_label = $CanvasLayer/HoverUnitPanel/StaminaValueLabel
+@onready var hover_stamina_bar = $CanvasLayer/HoverUnitPanel/StaminaBar
+@onready var hover_hp_text_label = $CanvasLayer/HoverUnitPanel/HPTextLabel
+@onready var hover_stamina_text_label = $CanvasLayer/HoverUnitPanel/StaminaTextLabel
+
+@onready var phase_popup = $CanvasLayer/PhasePopup
+@onready var phase_panel = $CanvasLayer/PhasePopup/PhasePanel
+@onready var phase_label = $CanvasLayer/PhasePopup/PhasePanel/PhaseLabel
+
+@onready var phase_dim = $CanvasLayer/PhasePopup/ScreenDim
+
 # ==================================================
 # CONSTANTS
 # ==================================================
@@ -1098,14 +1118,6 @@ func _draw():
 		has_pending_move()
 	)
 
-	if not editor_mode:
-
-		render_system.draw_turn_indicator(
-			self,
-			turn_manager,
-			turn_number
-		)
-
 	render_system.draw_wait_confirmation_prompt(
 		self,
 		awaiting_wait_confirmation
@@ -1130,37 +1142,6 @@ func _draw():
 	draw_editor_move_preview()
 	draw_editor_ui()
 	draw_editor_resize_ui()
-
-	var inspected_unit_index = -1
-
-	if inspected_unit_id != -1:
-		inspected_unit_index = unit_query.get_unit_index_by_id(
-			units,
-			inspected_unit_id
-		)
-
-	if (
-		not editor_mode
-		and not awaiting_support_confirmation
-		and not awaiting_wait_confirmation
-	):
-		var preview_unit = -1
-		var preview_damage = 0
-
-		if awaiting_attack_confirmation:
-			preview_unit = pending_attack_target
-			preview_damage = get_pending_attack_preview_damage()
-
-		render_system.draw_hover_unit_panel(
-			self,
-			units,
-			unit_query,
-			hovered_cell,
-			inspected_unit_index,
-			selected_unit,
-			preview_unit,
-			preview_damage
-		)
 
 # =========================
 # Draws all defender leash
@@ -1384,6 +1365,262 @@ func draw_inspected_unit_threat_range():
 			Color(1.0, 0.0, 0.0, 0.25)
 		)
 
+# =========================
+# Updates hover unit UI panel.
+# =========================
+
+func update_hover_unit_panel():
+
+	if (
+		editor_mode
+		or awaiting_support_confirmation
+		or awaiting_wait_confirmation
+	):
+		hover_unit_panel.visible = false
+		return
+
+	var inspected_unit_index = -1
+
+	if inspected_unit_id != -1:
+		inspected_unit_index = unit_query.get_unit_index_by_id(
+			units,
+			inspected_unit_id
+		)
+
+	var preview_unit = -1
+	var preview_damage = 0
+
+	if awaiting_attack_confirmation:
+		preview_unit = pending_attack_target
+		preview_damage = get_pending_attack_preview_damage()
+
+	var display_unit = preview_unit
+
+	if display_unit == -1:
+		display_unit = unit_query.get_unit_at(
+			units,
+			hovered_cell
+		)
+
+	if display_unit == -1:
+		display_unit = inspected_unit_index
+
+	if display_unit == -1:
+		display_unit = selected_unit
+
+	if display_unit == -1:
+		hover_unit_panel.visible = false
+		return
+
+	if display_unit < 0 or display_unit >= units.size():
+		hover_unit_panel.visible = false
+		return
+
+	var unit = units[display_unit]
+
+	var panel_style = StyleBoxFlat.new()
+
+	panel_style.bg_color = Color(0.008, 0.008, 0.212, 1.0)
+
+	panel_style.border_width_left = 4
+	panel_style.border_width_top = 4
+	panel_style.border_width_right = 4
+	panel_style.border_width_bottom = 4
+
+	panel_style.corner_radius_top_left = 8
+	panel_style.corner_radius_top_right = 8
+	panel_style.corner_radius_bottom_left = 8
+	panel_style.corner_radius_bottom_right = 8
+
+	if unit["team"] == "enemy":
+
+		panel_style.border_color = Color(0.9, 0.2, 0.2)
+
+		panel_style.bg_color = Color(0.028, 0.0, 0.0, 0.949)
+
+	else:
+
+		panel_style.border_color = Color(0.2, 0.45, 1.0)
+
+		panel_style.bg_color = Color(0.02,0.03,0.12,0.95)
+
+	hover_unit_panel.add_theme_stylebox_override(
+		"panel",
+		panel_style
+	)
+
+	hover_unit_panel.visible = true
+
+	hover_hp_text_label.position = Vector2(24, 56)
+	hover_hp_text_label.text = "HP"
+
+	hover_stamina_text_label.position = Vector2(24, 78)
+	hover_stamina_text_label.text = "STA"
+
+	# Match old drawn panel layout.
+	hover_unit_panel.position = Vector2(16, 16)
+	hover_unit_panel.size = Vector2(380, 112)
+
+	hover_unit_name_label.position = Vector2(24, 16)
+	hover_unit_name_label.text = unit["class"].capitalize()
+
+	var preview_hp = unit["hp"]
+
+	if preview_damage > 0:
+		preview_hp = max(unit["hp"] - preview_damage, 0)
+
+	hover_hp_value_label.position = Vector2(285, 18)
+	hover_hp_value_label.text = str(preview_hp) + "/" + str(unit["max_hp"])
+
+	var hp_bar_pos = Vector2(105, 56)
+	var hp_bar_size = Vector2(235, 22)
+
+	var hp_percent = float(unit["hp"]) / float(unit["max_hp"])
+	var hp_fill_width = hp_bar_size.x * hp_percent
+
+	var preview_percent = float(preview_hp) / float(unit["max_hp"])
+	var preview_fill_width = hp_bar_size.x * preview_percent
+
+	hover_hp_bar.position = hp_bar_pos
+	hover_hp_bar.size = Vector2(hp_fill_width, hp_bar_size.y)
+
+	if unit["team"] == "enemy":
+		hover_hp_bar.color = Color(0.85, 0.2, 0.2)
+	else:
+		hover_hp_bar.color = Color(0.2, 0.85, 0.2)
+
+	var damage_width = hp_fill_width - preview_fill_width
+
+	if preview_damage > 0 and damage_width > 0:
+		hover_hp_preview_bar.visible = true
+		hover_hp_preview_bar.position = Vector2(
+			hp_bar_pos.x + preview_fill_width,
+			hp_bar_pos.y
+		)
+		hover_hp_preview_bar.size = Vector2(damage_width, hp_bar_size.y)
+		hover_hp_preview_bar.color = Color(1.0, 0.9, 0.0, 0.95)
+	else:
+		hover_hp_preview_bar.visible = false
+
+	var stamina_bar_pos = Vector2(105, 86)
+	var stamina_bar_size = Vector2(150, 12)
+
+	var stamina_percent = float(unit["stamina"]) / float(unit["max_stamina"])
+	var stamina_fill_width = stamina_bar_size.x * stamina_percent
+
+	hover_stamina_bar.position = stamina_bar_pos
+	hover_stamina_bar.size = Vector2(stamina_fill_width, stamina_bar_size.y)
+	hover_stamina_bar.color = Color(0.95, 0.65, 0.18)
+
+	hover_stamina_value_label.position = Vector2(260, 78)
+	hover_stamina_value_label.text = (
+		str(unit["stamina"])
+		+ "/"
+		+ str(unit["max_stamina"])
+	)
+
+# =========================
+# Shows center-screen phase popup.
+# =========================
+
+func show_phase_popup(custom_text: String = ""):
+
+	var phase_text = custom_text
+
+	if phase_text == "":
+		phase_text = "Player Phase"
+
+		if turn_manager.current_team == "enemy":
+			phase_text = "Enemy Phase"
+
+	if custom_text != "":
+		phase_label.text = phase_text
+	else:
+		phase_label.text = phase_text + "  |  Turn " + str(turn_number)
+
+	var is_enemy_phase = (
+		phase_text == "Enemy Phase"
+	)
+
+	var phase_border_color = Color(0.2, 0.45, 1.0)
+	var phase_bg_color = Color(0.0, 0.02, 0.08, 0.95)
+	var phase_text_color = Color(0.45, 0.7, 1.0)
+
+	if is_enemy_phase:
+		phase_border_color = Color(0.9, 0.2, 0.2)
+		phase_bg_color = Color(0.03, 0.0, 0.0, 0.95)
+		phase_text_color = Color(1.0, 0.25, 0.25)
+
+	phase_label.add_theme_color_override(
+		"font_color",
+		phase_text_color
+	)
+
+	var viewport_size = get_viewport_rect().size
+	var popup_size = Vector2(620, 120)
+
+	phase_popup.position = Vector2.ZERO
+	phase_popup.size = viewport_size
+
+	phase_dim.position = Vector2.ZERO
+	phase_dim.size = viewport_size
+
+	if custom_text == "Battle Commence":
+		phase_dim.visible = true
+		phase_dim.color = Color(0.0, 0.0, 0.0, 0.35)
+	else:
+		phase_dim.visible = false
+
+	phase_panel.size = popup_size
+	phase_panel.position = (viewport_size - popup_size) / 2.0
+
+	phase_label.size = popup_size
+	phase_label.position = Vector2.ZERO
+	phase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	phase_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	var panel_style = StyleBoxFlat.new()
+	panel_style.bg_color = phase_bg_color
+	panel_style.border_color = phase_border_color
+
+	panel_style.border_width_left = 4
+	panel_style.border_width_top = 4
+	panel_style.border_width_right = 4
+	panel_style.border_width_bottom = 4
+
+	panel_style.corner_radius_top_left = 14
+	panel_style.corner_radius_top_right = 14
+	panel_style.corner_radius_bottom_left = 14
+	panel_style.corner_radius_bottom_right = 14
+
+	phase_panel.add_theme_stylebox_override(
+		"panel",
+		panel_style
+	)
+
+	phase_popup.visible = true
+	phase_popup.modulate.a = 1.0
+
+	var tween = create_tween()
+
+	tween.tween_interval(1.25)
+
+	tween.tween_property(
+		phase_popup,
+		"modulate:a",
+		0.0,
+		0.55
+	)
+
+	tween.tween_callback(
+		func():
+			phase_popup.visible = false
+			phase_dim.visible = false
+			phase_popup.modulate.a = 1.0
+	)
+
+	await tween.finished
+
 # ==================================================
 # ENGINE CALLBACKS
 # ==================================================
@@ -1393,6 +1630,8 @@ func draw_inspected_unit_threat_range():
 # =========================
 
 func _ready():
+
+	phase_popup.visible = false
 
 	if FileAccess.file_exists(get_editor_map_path()):
 
@@ -1410,6 +1649,9 @@ func _ready():
 
 	queue_redraw()
 
+	await show_phase_popup("Battle Commence")
+	await show_phase_popup()
+
 # =========================
 # Per-frame updates.
 # =========================
@@ -1419,6 +1661,7 @@ func _process(_delta):
 	var mouse_pos = get_viewport().get_mouse_position()
 
 	hovered_cell = map_data.world_to_grid(mouse_pos)
+	update_hover_unit_panel()
 
 	# =========================
 	# Editor drag painting
@@ -1661,15 +1904,12 @@ func end_current_turn():
 
 	turn_manager.end_turn(units)
 
-	if turn_manager.current_team == "player":
-		turn_number += 1
-
 	clear_selection()
 	inspected_unit_id = -1
 
 	queue_redraw()
-	process_ai_turn_if_needed()
 
+	await start_ai_turn_if_needed()
 
 # =========================
 # Confirms wait action.
@@ -2392,7 +2632,7 @@ func handle_facing_click(clicked_cell: Vector2i):
 	)
 
 	queue_redraw()
-	process_ai_turn_if_needed()
+	await start_ai_turn_if_needed()
 
 # =========================
 # Confirms pending attack.
@@ -2441,7 +2681,7 @@ func confirm_attack():
 	)
 
 	queue_redraw()
-	process_ai_turn_if_needed()
+	await start_ai_turn_if_needed()
 
 # =========================
 # Confirms wait action.
@@ -2486,7 +2726,7 @@ func confirm_wait():
 	)
 
 	queue_redraw()
-	process_ai_turn_if_needed()
+	await start_ai_turn_if_needed()
 
 # =========================
 # Confirms selected support action.
@@ -2530,7 +2770,7 @@ func confirm_support_action(
 	)
 
 	queue_redraw()
-	process_ai_turn_if_needed()
+	await start_ai_turn_if_needed()
 
 # ==================================================
 # ARCHER HELPERS
@@ -2568,6 +2808,25 @@ func get_best_archer_distance_squared_to_tile(
 			best_distance_squared = distance_squared
 
 	return best_distance_squared
+
+# =========================
+# Starts AI phase after showing
+# the enemy phase popup.
+# =========================
+
+func start_ai_turn_if_needed():
+
+	if turn_manager.current_team == "player":
+		return
+
+	clear_selection()
+	inspected_unit_id = -1
+
+	queue_redraw()
+
+	await show_phase_popup()
+
+	await process_ai_turn_if_needed()
 
 # =========================
 # Processes the current team's AI turn
@@ -2659,6 +2918,8 @@ func process_ai_turn_if_needed():
 	inspected_unit_id = -1
 
 	queue_redraw()
+
+	await show_phase_popup()
 
 # =========================
 # Visually animates a unit

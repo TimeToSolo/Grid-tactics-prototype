@@ -21,6 +21,7 @@
 [ext_resource type="Script" uid="uid://nttnhly4fbm2" path="res://editor_system.gd" id="19_cegan"]
 [ext_resource type="Script" uid="uid://dikivmag3p7lf" path="res://map_serializer.gd" id="20_82xsv"]
 [ext_resource type="Script" uid="uid://d2r7naq6y7lrm" path="res://ai_system.gd" id="21_getpj"]
+[ext_resource type="Script" uid="uid://chwbsu724tdjh" path="res://hover_unit_panel.gd" id="22_ryguw"]
 
 [node name="Main" type="Node2D" unique_id=370152938]
 script = ExtResource("1_ig7tw")
@@ -95,52 +96,30 @@ script = ExtResource("12_dg77c")
 
 [node name="CanvasLayer" type="Node" parent="." unique_id=1191476634]
 
-[node name="PhasePopup" type="Control" parent="CanvasLayer" unique_id=1694046668]
-layout_mode = 3
-anchors_preset = 0
+[node name="PhasePopup" type="Node" parent="CanvasLayer" unique_id=1430036670]
 
-[node name="PhasePanel" type="Panel" parent="CanvasLayer/PhasePopup" unique_id=645213892]
-layout_mode = 0
+[node name="PhasePanel" type="Node" parent="CanvasLayer/PhasePopup" unique_id=723508628]
 
-[node name="PhaseLabel" type="Label" parent="CanvasLayer/PhasePopup/PhasePanel" unique_id=1391185492]
-layout_mode = 0
-theme_override_font_sizes/font_size = 48
-
-[node name="ScreenDim" type="ColorRect" parent="CanvasLayer/PhasePopup" unique_id=1703010972]
-layout_mode = 0
+[node name="PhaseLabel" type="Node" parent="CanvasLayer/PhasePopup/PhasePanel" unique_id=912168933]
 
 [node name="HoverUnitPanel" type="Panel" parent="CanvasLayer" unique_id=1196149188]
 visible = false
-
-[node name="HPTextLabel" type="Label" parent="CanvasLayer/HoverUnitPanel" unique_id=1930191028]
-layout_mode = 0
-offset_right = 40.0
-offset_bottom = 23.0
-theme_override_font_sizes/font_size = 20
+script = ExtResource("22_ryguw")
 
 [node name="HPValueLabel" type="Label" parent="CanvasLayer/HoverUnitPanel" unique_id=1519838071]
 layout_mode = 0
 offset_right = 1.0
 offset_bottom = 23.0
-theme_override_font_sizes/font_size = 22
-
-[node name="StaminaTextLabel" type="Label" parent="CanvasLayer/HoverUnitPanel" unique_id=1596007951]
-layout_mode = 0
-offset_right = 40.0
-offset_bottom = 23.0
-theme_override_font_sizes/font_size = 18
 
 [node name="StaminaValueLabel" type="Label" parent="CanvasLayer/HoverUnitPanel" unique_id=559540202]
 layout_mode = 0
 offset_right = 1.0
 offset_bottom = 23.0
-theme_override_font_sizes/font_size = 18
 
 [node name="UnitNameLabel" type="Label" parent="CanvasLayer/HoverUnitPanel" unique_id=1606040855]
 layout_mode = 0
 offset_right = 1.0
 offset_bottom = 23.0
-theme_override_font_sizes/font_size = 32
 
 [node name="HPBar" type="ColorRect" parent="CanvasLayer/HoverUnitPanel" unique_id=120792327]
 layout_mode = 0

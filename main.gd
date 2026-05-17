@@ -1626,8 +1626,24 @@ func show_phase_popup(custom_text: String = ""):
 # ==================================================
 
 # =========================
-# Initial setup.
+# Starts a fresh battle state.
 # =========================
+
+func start_battle_flow():
+
+	turn_number = 1
+	turn_manager.current_team = "player"
+
+	for unit in units:
+		unit["has_acted"] = false
+
+	clear_selection()
+
+	queue_redraw()
+
+	await show_phase_popup("Battle Commence")
+	await show_phase_popup()
+
 
 func _ready():
 
@@ -1647,10 +1663,15 @@ func _ready():
 		map_data.normalize_terrain_rows()
 		units = battle_setup.create_battle_units(unit_data)
 
-	queue_redraw()
+	turn_number = 1
+	turn_manager.current_team = "player"
 
-	await show_phase_popup("Battle Commence")
-	await show_phase_popup()
+	for unit in units:
+		unit["has_acted"] = false
+
+	clear_selection()
+
+	queue_redraw()
 
 # =========================
 # Per-frame updates.
@@ -1691,6 +1712,8 @@ func _process(_delta):
 			map_data,
 			units,
 			unit_query,
+			coverage_system,
+			unit_logic,
 			selected_unit,
 			selected_unit_start_cell,
 			hovered_cell,
@@ -1742,9 +1765,13 @@ func handle_keyboard_input(event):
 				cycle_editor_ai_profile()
 
 		KEY_E:
+
 			editor_mode = !editor_mode
 
 			clear_pending_action_state()
+
+			if not editor_mode:
+				await start_battle_flow()
 
 			queue_redraw()
 

@@ -24,6 +24,8 @@ func update_hover_path(
 	map_data,
 	units: Array,
 	unit_query,
+	coverage_system,
+	unit_logic,
 	selected_unit: int,
 	selected_unit_start_cell: Vector2i,
 	hovered_cell: Vector2i,
@@ -61,11 +63,10 @@ func update_hover_path(
 
 	if map_data.get_grid_distance(last_cell, hovered_cell) == 1:
 
-		var new_path = current_path.duplicate()
-		new_path.append(hovered_cell)
+		var manual_path = current_path.duplicate()
+		manual_path.append(hovered_cell)
 
-		# Path includes the starting tile, so spent movement is size - 1.
-		var movement_spent = new_path.size() - 1
+		var movement_spent = manual_path.size() - 1
 
 		if movement_spent > units[selected_unit]["move"]:
 
@@ -78,7 +79,40 @@ func update_hover_path(
 				hovered_cell
 			)
 
-		return new_path
+		if _path_enters_enemy_coverage(
+			manual_path,
+			units,
+			coverage_system,
+			unit_logic,
+			selected_unit
+		):
+			return manual_path
+
+		var shortest_path = _get_shortest_path_to_hover(
+			map_data,
+			units,
+			unit_query,
+			selected_unit,
+			selected_unit_start_cell,
+			hovered_cell
+		)
+
+		if shortest_path.is_empty():
+			return manual_path
+
+		if _path_enters_enemy_coverage(
+			shortest_path,
+			units,
+			coverage_system,
+			unit_logic,
+			selected_unit
+		):
+			return manual_path
+
+		if shortest_path.size() < manual_path.size():
+			return shortest_path
+
+		return manual_path
 
 	return _get_shortest_path_to_hover(
 		map_data,
@@ -147,6 +181,44 @@ func get_path_preview_from_path(
 		"danger_cells": danger_cells,
 		"countering_units": countering_units
 	}
+
+# =========================
+# Returns true if a path enters
+# enemy coverage at any step.
+#
+# Used to preserve deliberate
+# risky movement paths.
+# =========================
+
+func _path_enters_enemy_coverage(
+	path_cells: Array[Vector2i],
+	units: Array,
+	coverage_system,
+	unit_logic,
+	selected_unit: int
+) -> bool:
+
+	if path_cells.size() <= 1:
+		return false
+
+	for i in range(1, path_cells.size()):
+
+		var step_path: Array[Vector2i] = [
+			path_cells[i - 1],
+			path_cells[i]
+		]
+
+		var entered_enemies = coverage_system.get_enemies_entered_coverage_along_path(
+			units,
+			unit_logic,
+			selected_unit,
+			step_path
+		)
+
+		if not entered_enemies.is_empty():
+			return true
+
+	return false
 
 # =========================
 # Fallback helper for when cursor jumps

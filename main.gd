@@ -1141,17 +1141,25 @@ func _draw():
 
 	if (
 		not editor_mode
-		and not awaiting_attack_confirmation
 		and not awaiting_support_confirmation
 		and not awaiting_wait_confirmation
 	):
+		var preview_unit = -1
+		var preview_damage = 0
+
+		if awaiting_attack_confirmation:
+			preview_unit = pending_attack_target
+			preview_damage = get_pending_attack_preview_damage()
+
 		render_system.draw_hover_unit_panel(
 			self,
 			units,
 			unit_query,
 			hovered_cell,
 			inspected_unit_index,
-			selected_unit
+			selected_unit,
+			preview_unit,
+			preview_damage
 		)
 
 # =========================
@@ -1677,11 +1685,52 @@ func handle_wait_hotkey():
 # Confirms attack action.
 # =========================
 
+# =========================
+# Returns predicted attack damage
+# for the currently pending attack.
+#
+# Simulates post-movement stamina
+# before calculating damage so
+# previews match real combat results.
+#
+# Used by attack confirmation UI.
+# =========================
+
 func handle_attack_confirm_hotkey():
 
 	if awaiting_attack_confirmation:
 		confirm_attack()
 
+func get_pending_attack_preview_damage() -> int:
+
+	if not awaiting_attack_confirmation:
+		return 0
+
+	if selected_unit == -1:
+		return 0
+
+	if pending_attack_target == -1:
+		return 0
+
+	if selected_unit >= units.size():
+		return 0
+
+	if pending_attack_target >= units.size():
+		return 0
+
+	var simulated_attacker = units[selected_unit].duplicate()
+
+	var movement_cost = (
+		pending_move_distance
+		* simulated_attacker["move_stamina_cost"]
+	)
+
+	simulated_attacker["stamina"] = max(
+		simulated_attacker["stamina"] - movement_cost,
+		0
+	)
+
+	return combat_logic.get_attack_damage(simulated_attacker)
 
 # =========================
 # Confirms direct heal action.

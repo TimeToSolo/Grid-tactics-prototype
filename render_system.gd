@@ -45,7 +45,7 @@ func draw_grid(
 func draw_move_tiles(
 	canvas: CanvasItem,
 	map_data,
-	units: Array,
+	_units: Array,
 	selected_unit: int,
 	move_tiles: Array[Vector2i]
 ):
@@ -629,11 +629,11 @@ func draw_wait_confirmation_prompt(
 
 	canvas.draw_string(
 		ThemeDB.fallback_font,
-		Vector2(260, 30),
-		"Wait? W / Cancel: N",
+		Vector2(430, 74),
+		"Attack? Y/N",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
-		20,
+		24,
 		Color.WHITE
 	)
 
@@ -652,11 +652,11 @@ func draw_attack_confirmation_prompt(
 
 	canvas.draw_string(
 		ThemeDB.fallback_font,
-		Vector2(260, 30),
+		Vector2(420, 69),
 		"Attack? Y/N",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
-		20,
+		24,
 		Color.WHITE
 	)
 
@@ -708,13 +708,18 @@ func draw_hover_unit_panel(
 	unit_query,
 	hovered_cell: Vector2i,
 	inspected_unit: int,
-	selected_unit: int
+	selected_unit: int,
+	preview_unit: int = -1,
+	preview_damage: int = 0
 ):
 
-	var display_unit = unit_query.get_unit_at(
-		units,
-		hovered_cell
-	)
+	var display_unit = preview_unit
+
+	if display_unit == -1:
+		display_unit = unit_query.get_unit_at(
+			units,
+			hovered_cell
+		)
 
 	if display_unit == -1:
 		display_unit = inspected_unit
@@ -769,7 +774,12 @@ func draw_hover_unit_panel(
 		Color.WHITE
 	)
 
-	var hp_text = str(unit["hp"]) + "/" + str(unit["max_hp"])
+	var preview_hp = unit["hp"]
+
+	if preview_damage > 0:
+		preview_hp = max(unit["hp"] - preview_damage, 0)
+
+	var hp_text = str(preview_hp) + "/" + str(unit["max_hp"])
 
 	canvas.draw_string(
 		font,
@@ -796,6 +806,9 @@ func draw_hover_unit_panel(
 	var hp_percent = float(unit["hp"]) / float(unit["max_hp"])
 	var hp_fill_width = hp_bar_size.x * hp_percent
 
+	var preview_percent = float(preview_hp) / float(unit["max_hp"])
+	var preview_fill_width = hp_bar_size.x * preview_percent
+
 	var hp_fill_color = Color(0.2, 0.85, 0.2)
 
 	if unit["team"] == "enemy":
@@ -815,6 +828,21 @@ func draw_hover_unit_panel(
 		hp_fill_color,
 		true
 	)
+
+	if preview_damage > 0:
+
+		var damage_x = hp_bar_pos.x + preview_fill_width
+		var damage_width = hp_fill_width - preview_fill_width
+
+		if damage_width > 0:
+			canvas.draw_rect(
+				Rect2(
+					Vector2(damage_x, hp_bar_pos.y),
+					Vector2(damage_width, hp_bar_size.y)
+				),
+				Color(1.0, 0.9, 0.0, 0.95),
+				true
+			)
 
 	canvas.draw_rect(
 		Rect2(hp_bar_pos, hp_bar_size),

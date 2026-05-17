@@ -2,7 +2,7 @@
 
 Turn-based tactical combat prototype built in Godot using GDScript.
 
-This project explores tactical combat centered around movement, facing, stamina, directional coverage, territorial control, battlefield pressure, terrain-aware navigation, and formation-based engagements.
+This project explores tactical combat centered around movement, facing, stamina, directional coverage, territorial control, battlefield pressure, terrain-aware navigation, formation-based engagements, readable AI behavior, and sequential battlefield presentation.
 
 The goal is to create battles where:
 - positioning matters before attacks happen
@@ -11,6 +11,7 @@ The goal is to create battles where:
 - movement itself creates tactical vulnerability
 - chokepoints and navigation matter tactically
 - AI behaves consistently within terrain constraints
+- enemy actions remain readable and visually understandable
 
 Rather than focusing on raw stat trading, the prototype emphasizes:
 - formation integrity
@@ -21,6 +22,7 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - readable battlefield threat
 - terrain-aware tactical positioning
 - navigable battlefield control
+- sequential combat readability
 
 ---
 
@@ -40,6 +42,9 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Attack, heal, regeneration, wait, and facing confirmation flow
 - Auto-end turn when all units on the active team are exhausted
 - Multi-team turn support (`player`, `enemy`, `neutral`, etc.)
+- Sequential enemy turn presentation
+- Delayed enemy action pacing
+- Attack timing synced with visible HP updates
 
 ## Movement and Pathing
 
@@ -56,6 +61,10 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - AI path evaluation using actual reachable routes
 - Traffic-aware movement handling
 - Chokepoint-aware movement behavior
+- Animated sequential AI movement
+- Tile-by-tile enemy movement presentation
+- Future-path directional facing
+- AI facing based on continued navigable routes
 
 ## Unit Types
 
@@ -86,6 +95,8 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Terrain-driven engagement flow
 - Bridge and lane-control gameplay
 - Stamina-driven battlefield pacing
+- Direction-aware enemy presentation
+- Sequential battlefield readability systems
 
 ## AI Systems
 
@@ -102,6 +113,9 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Support/healer AI
 - Terrain-aware ranged movement evaluation
 - Reachable-target attack positioning
+- AI action-result reporting architecture
+- Decoupled AI logic and presentation layer
+- Future-path facing evaluation
 
 ### Current AI Profiles
 
@@ -113,6 +127,7 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Ignores coverage danger
 - Respects terrain/pathing restrictions
 - Uses actual navigable routes
+- Faces toward future navigable movement routes
 
 #### Defender
 
@@ -123,6 +138,7 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Restores original facing direction while idle
 - Never chases endlessly across the map
 - Uses terrain-aware movement evaluation
+- Faces toward future navigable movement routes while advancing
 
 #### Cautious Ranged
 
@@ -132,6 +148,7 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Prioritizes reachable attack positions
 - Repositions before attacking when possible
 - Uses actual traversable routes for movement evaluation
+- Does not rely on directional coverage facing
 
 #### Support Healer
 
@@ -182,6 +199,12 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Real-time hovered unit display
 - Selected enemy threat inspection UI
 - Terrain-combat readability improvements
+- Sequential enemy movement readability
+- Attack lunge animations
+- Delayed HP update presentation
+- Enemy action pacing pauses
+- Hidden facing during movement animations
+- Future-path AI facing presentation
 
 ---
 
@@ -202,6 +225,8 @@ This prototype is focused on creating tactical battles where:
 - positioning matters before attacks happen
 - navigable routes matter more than geometric proximity
 - chokepoints create meaningful tactical pressure
+- enemy actions remain visually understandable
+- battlefield flow can be read at a glance
 
 The combat system draws inspiration from tactical RPGs and strategy games, but replaces unlimited counterattacks with stamina-limited directional coverage and reaction systems.
 
@@ -212,6 +237,7 @@ The long-term goal is to create battles that feel:
 - terrain-aware
 - tactically expressive
 - formation-focused
+- visually understandable
 
 rather than purely statistical.
 
@@ -234,6 +260,8 @@ rather than purely statistical.
 - Safe-path evaluation
 - Terrain-preference AI
 - Coverage-avoidance logic
+- Formation cohesion behavior
+- AI fallback line behavior
 
 ## Tactical Systems
 
@@ -249,6 +277,8 @@ rather than purely statistical.
 - Engineer/barricade systems
 - Destructible battlefield fortifications
 - Temporary deployable terrain
+- Expanded battlefield readability systems
+- Sprite-based combat presentation
 
 ---
 
@@ -256,7 +286,7 @@ rather than purely statistical.
 
 Early prototype / active development.
 
-Systems, balance, AI behavior, editor tooling, map design, and tactical pacing are experimental and subject to change as the tactical framework evolves.
+Systems, balance, AI behavior, editor tooling, map design, tactical pacing, and presentation systems are experimental and subject to change as the tactical framework evolves.
 
 Recent development has focused heavily on:
 - terrain-aware pathfinding
@@ -274,3 +304,8 @@ Recent development has focused heavily on:
 - coverage path traversal logic
 - tutorial encounter design
 - codebase cleanup and system normalization
+- sequential AI movement presentation
+- attack timing synchronization
+- future-path AI facing
+- AI/presentation layer separation
+- battlefield readability improvements

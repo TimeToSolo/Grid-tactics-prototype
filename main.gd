@@ -2587,10 +2587,7 @@ func process_ai_turn_if_needed():
 	var unit_ids: Array[int] = []
 
 	for unit in units:
-		if (
-			unit["team"] == turn_manager.current_team
-			and not unit["has_acted"]
-		):
+		if unit["team"] == turn_manager.current_team and not unit["has_acted"]:
 			unit_ids.append(unit["id"])
 
 	for unit_id in unit_ids:
@@ -2606,7 +2603,7 @@ func process_ai_turn_if_needed():
 		if units[unit_index]["has_acted"]:
 			continue
 
-		ai_system.take_unit_turn(
+		var action_result = ai_system.take_unit_turn(
 			units,
 			unit_index,
 			map_data,
@@ -2618,9 +2615,35 @@ func process_ai_turn_if_needed():
 			stamina_system
 		)
 
+		if action_result.has("path_cells"):
+			await animate_unit_path(
+				unit_index,
+				action_result["path_cells"]
+			)
+
+		if action_result.has("attacked") and action_result["attacked"]:
+
+			await animate_attack_lunge(
+				action_result["attacker_index"],
+				action_result["target_index"]
+			)
+
+			var target_index = action_result["target_index"]
+
+			if target_index != -1 and target_index < units.size():
+
+				if action_result.has("damage"):
+					units[target_index]["hp"] -= action_result["damage"]
+
+				queue_redraw()
+				await get_tree().create_timer(0.15).timeout
+
+				if action_result.has("target_died") and action_result["target_died"]:
+					units.remove_at(target_index)
+
 		queue_redraw()
 
-		await get_tree().create_timer(0.25).timeout
+		await get_tree().create_timer(0.15).timeout
 
 	stamina_system.recover_idle_healers(
 		units,
@@ -2636,3 +2659,98 @@ func process_ai_turn_if_needed():
 	inspected_unit_id = -1
 
 	queue_redraw()
+
+# =========================
+# Visually animates a unit
+# along a movement path using
+# tile-by-tile interpolation.
+#
+# Logical movement is already
+# resolved before animation.
+#
+# This function only handles
+# visual presentation and
+# enemy phase readability.
+# =========================
+
+func animate_unit_path(
+	unit_index: int,
+	path_cells: Array
+):
+
+	if unit_index == -1:
+		return
+
+	if unit_index >= units.size():
+		return
+
+	if path_cells.size() <= 1:
+		return
+
+	var original_facing = units[unit_index]["facing"]
+	units[unit_index]["facing"] = Vector2i.ZERO
+
+	for i in range(1, path_cells.size()):
+
+		if unit_index >= units.size():
+			return
+
+		var from_cell = path_cells[i - 1]
+		var to_cell = path_cells[i]
+
+		var from_pos = map_data.grid_rect(from_cell).position
+		var to_pos = map_data.grid_rect(to_cell).position
+
+		units[unit_index]["draw_offset"] = from_pos - to_pos
+		units[unit_index]["pos"] = to_cell
+
+		queue_redraw()
+		await get_tree().create_timer(0.08).timeout
+
+		units[unit_index]["draw_offset"] = Vector2.ZERO
+
+		queue_redraw()
+		await get_tree().create_timer(0.02).timeout
+
+	units[unit_index]["facing"] = original_facing
+	queue_redraw()
+
+# =========================
+# Plays a brief attack lunge
+# animation toward the target.
+#
+# Used during enemy phase to
+# improve combat readability
+# without large attack effects.
+#
+# This is purely visual and
+# does not affect gameplay logic.
+# =========================
+
+func animate_attack_lunge(
+	attacker_index: int,
+	target_index: int
+):
+
+	if attacker_index == -1 or target_index == -1:
+		return
+
+	if attacker_index >= units.size() or target_index >= units.size():
+		return
+
+	var direction = units[target_index]["pos"] - units[attacker_index]["pos"]
+
+	var offset = Vector2(
+		sign(direction.x),
+		sign(direction.y)
+	) * 10.0
+
+	units[attacker_index]["draw_offset"] = offset
+
+	queue_redraw()
+	await get_tree().create_timer(0.1).timeout
+
+	units[attacker_index]["draw_offset"] = Vector2.ZERO
+
+	queue_redraw()
+	await get_tree().create_timer(0.1).timeout

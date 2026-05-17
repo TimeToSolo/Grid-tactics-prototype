@@ -476,6 +476,7 @@ func draw_units(
 
 		var pos = unit["pos"]
 		var unit_rect = map_data.grid_rect(pos)
+		unit_rect.position += unit["draw_offset"]
 
 		var unit_color = unit_logic.get_unit_color(
 			unit["class"]

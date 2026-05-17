@@ -161,6 +161,7 @@ func create_unit(
 	var unit = {
 		"id": next_unit_id,
 		"pos": pos,
+		"draw_offset": Vector2.ZERO,
 		"move": template["move"],
 		"facing": facing,
 

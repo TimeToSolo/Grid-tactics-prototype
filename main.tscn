@@ -21,6 +21,7 @@
 [ext_resource type="Script" uid="uid://nttnhly4fbm2" path="res://editor_system.gd" id="19_cegan"]
 [ext_resource type="Script" uid="uid://dikivmag3p7lf" path="res://map_serializer.gd" id="20_82xsv"]
 [ext_resource type="Script" uid="uid://d2r7naq6y7lrm" path="res://ai_system.gd" id="21_getpj"]
+[ext_resource type="Script" uid="uid://dr6mq6wnlr3h8" path="res://action_menu_controller.gd" id="22_ryguw"]
 
 [node name="Main" type="Node2D" unique_id=370152938]
 script = ExtResource("1_ig7tw")
@@ -49,6 +50,17 @@ script = ExtResource("5_lquwl")
 
 [node name="StaminaSystem" type="Node" parent="Logic" unique_id=97320835]
 script = ExtResource("9_kek77")
+
+[node name="Queries" type="Node" parent="." unique_id=448626345]
+
+[node name="UnitQuery" type="Node" parent="Queries" unique_id=543358470]
+script = ExtResource("8_5vw27")
+
+[node name="HoverQuery" type="Node" parent="Queries" unique_id=1251015729]
+script = ExtResource("11_efxa6")
+
+[node name="ActionQuery" type="Node" parent="Queries" unique_id=171700439]
+script = ExtResource("12_dg77c")
 
 [node name="Systems" type="Node" parent="." unique_id=2011317438]
 
@@ -82,16 +94,8 @@ script = ExtResource("21_getpj")
 [node name="SelectionState" type="Node" parent="Systems" unique_id=348486065]
 script = ExtResource("13_ycdy4")
 
-[node name="Queries" type="Node" parent="." unique_id=448626345]
-
-[node name="UnitQuery" type="Node" parent="Queries" unique_id=543358470]
-script = ExtResource("8_5vw27")
-
-[node name="HoverQuery" type="Node" parent="Queries" unique_id=1251015729]
-script = ExtResource("11_efxa6")
-
-[node name="ActionQuery" type="Node" parent="Queries" unique_id=171700439]
-script = ExtResource("12_dg77c")
+[node name="ActionMenuController" type="Node" parent="Systems" unique_id=45933120]
+script = ExtResource("22_ryguw")
 
 [node name="CanvasLayer" type="Node" parent="." unique_id=1191476634]
 

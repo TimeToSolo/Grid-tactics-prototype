@@ -19,7 +19,6 @@ extends Node2D
 # - TurnManager
 # ==================================================
 
-
 # ==================================================
 # NODE REFERENCES
 # ==================================================
@@ -66,6 +65,7 @@ extends Node2D
 @onready var render_system = $Systems/RenderSystem
 @onready var selection_state = $Systems/SelectionState
 @onready var selection_system = $Systems/SelectionSystem
+@onready var action_menu_controller = $Systems/ActionMenuController
 
 # =========================
 # UI
@@ -158,34 +158,13 @@ var last_mouse_hover_cell: Vector2i = Vector2i(-1, -1)
 # ACTION MENU STATE
 # ==================================================
 
-# True while action menu is open.
-var action_menu_visible := false
-
-# Current visible menu options.
-var action_menu_options: Array[String] = []
-
-# Currently highlighted menu option index.
-var action_menu_index := 0
-
 # True after choosing Wait from the action menu.
 #
 # Enables directional facing selection.
 var awaiting_facing_selection := false
 
-# Current action menu stage.
-#
-# "destination" = after choosing move destination
-# "confirm_attack" = confirming attack target
-# "confirm_wait" = confirming facing/wait
-# "confirm_support" = confirming heal/support
-var action_menu_mode := ""
-
 # Facing tile chosen during a confirmation menu.
 var pending_facing_cell: Vector2i = Vector2i(-1, -1)
-
-# How the action menu was confirmed.
-# "keyboard" or "mouse"
-var action_menu_confirm_source := "keyboard"
 
 # True while player input is disabled.
 var input_locked := false
@@ -1118,7 +1097,7 @@ func _draw():
 
 	draw_cursor_preview()
 
-	if not action_menu_visible:
+	if not action_menu_controller.is_open():
 		render_system.draw_facing_choice_tiles(
 			self,
 			map_data,
@@ -1131,12 +1110,12 @@ func _draw():
 			get_valid_lancer_facing_tiles()
 		)
 
-	var selected_menu_option = get_selected_action_menu_option()
+	var selected_menu_option = action_menu_controller.get_selected_option()
 
 	var should_show_coverage_preview = (
-		not action_menu_visible
+		not action_menu_controller.is_open()
 		or (
-			action_menu_mode == "confirm_attack"
+			action_menu_controller.get_mode() == "confirm_attack"
 			and selected_menu_option == "Wait"
 		)
 	)
@@ -1144,7 +1123,7 @@ func _draw():
 	if should_show_coverage_preview:
 
 		if (
-			action_menu_mode == "confirm_attack"
+			action_menu_controller.get_mode() == "confirm_attack"
 			and selected_menu_option == "Wait"
 			and pending_facing_cell != Vector2i(-1, -1)
 		):
@@ -1191,9 +1170,9 @@ func _draw():
 	var attack_preview_cell = hovered_cell
 
 	if (
-		action_menu_visible
-		and action_menu_mode == "confirm_attack"
-		and get_selected_action_menu_option() == "Attack"
+		action_menu_controller.is_open()
+		and action_menu_controller.get_mode() == "confirm_attack"
+		and action_menu_controller.get_selected_option() == "Attack"
 		and pending_facing_cell != Vector2i(-1, -1)
 	):
 		attack_preview_cell = pending_facing_cell
@@ -1508,16 +1487,16 @@ func draw_cursor_preview():
 
 func update_hover_unit_panel():
 
-	var selected_menu_option = get_selected_action_menu_option()
+	var selected_menu_option = action_menu_controller.get_selected_option()
 
 	if (
 		editor_mode
 		or awaiting_support_confirmation
 		or awaiting_wait_confirmation
 		or (
-			action_menu_visible
+			action_menu_controller.is_open()
 			and (
-				action_menu_mode != "confirm_attack"
+				action_menu_controller.get_mode() != "confirm_attack"
 				or selected_menu_option != "Attack"
 			)
 		)
@@ -1772,159 +1751,6 @@ func show_phase_popup(custom_text: String = ""):
 	await tween.finished
 
 # =========================
-# Updates action menu UI.
-# =========================
-
-func update_action_menu():
-
-	if not action_menu_visible:
-		action_menu.visible = false
-		return
-
-	action_menu.visible = true
-
-	var labels = [
-		move_option_label,
-		attack_option_label,
-		heal_option_label,
-		wait_option_label
-	]
-
-	var row_height = 32
-	var padding_x = 12
-	var padding_top = 16
-	var padding_bottom = 24
-
-	var widest_text_width = 0
-
-	for option in action_menu_options:
-		var text_width = option.length() * 18
-		widest_text_width = max(widest_text_width, text_width)
-
-	var menu_width = max(
-		120,
-		widest_text_width + padding_x * 2 + 16
-	)
-
-	var menu_height = (
-		padding_top
-		+ padding_bottom
-		+ action_menu_options.size() * row_height
-	)
-
-	action_panel.size = Vector2(menu_width, menu_height)
-
-	var panel_style = StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.02, 0.03, 0.12, 0.95)
-	panel_style.border_color = Color(0.2, 0.45, 1.0)
-
-	panel_style.border_width_left = 3
-	panel_style.border_width_top = 3
-	panel_style.border_width_right = 3
-	panel_style.border_width_bottom = 3
-
-	panel_style.corner_radius_top_left = 8
-	panel_style.corner_radius_top_right = 8
-	panel_style.corner_radius_bottom_left = 8
-	panel_style.corner_radius_bottom_right = 8
-
-	action_panel.add_theme_stylebox_override(
-		"panel",
-		panel_style
-	)
-
-	action_vbox.position = Vector2(padding_x, padding_top)
-
-	action_vbox.size = Vector2(
-		menu_width - padding_x * 2,
-		menu_height - padding_top - padding_bottom
-	)
-
-	var menu_cell = pending_move_cell
-
-	if menu_cell == Vector2i(-1, -1) and selected_unit != -1:
-		menu_cell = units[selected_unit]["pos"]
-
-	var unit_rect = map_data.grid_rect(menu_cell)
-
-	var menu_pos = (
-		unit_rect.position
-		+ Vector2(unit_rect.size.x + 8, 0)
-	)
-
-	var viewport_size = get_viewport_rect().size
-	var menu_size = action_panel.size
-
-	# Right edge overflow -> flip left.
-	if menu_pos.x + menu_size.x > viewport_size.x:
-		menu_pos.x = (
-			unit_rect.position.x
-			- menu_size.x
-			- 8
-		)
-
-	# Bottom overflow -> push upward.
-	if menu_pos.y + menu_size.y > viewport_size.y:
-		menu_pos.y = (
-			viewport_size.y
-			- menu_size.y
-			- 8
-		)
-
-	# Top overflow -> clamp downward.
-	if menu_pos.y < 8:
-		menu_pos.y = 8
-
-	# Left overflow -> clamp rightward.
-	if menu_pos.x < 8:
-		menu_pos.x = 8
-
-	action_panel.position = menu_pos
-
-	for label in labels:
-		label.visible = false
-		label.custom_minimum_size = Vector2(
-			menu_width - padding_x * 2,
-			row_height
-		)
-
-	for i in range(action_menu_options.size()):
-
-		labels[i].visible = true
-
-		var option_text = action_menu_options[i]
-
-		if i == action_menu_index:
-			option_text = "▶ " + option_text
-			labels[i].add_theme_color_override(
-				"font_color",
-				Color(0.45, 0.7, 1.0)
-			)
-		else:
-			option_text = "   " + option_text
-			labels[i].add_theme_color_override(
-				"font_color",
-				Color.WHITE
-			)
-
-		labels[i].text = option_text
-
-# =========================
-# Returns currently selected
-# action menu option text.
-#
-# Returns:
-# - "" if menu is empty
-# =========================
-
-func get_selected_action_menu_option() -> String:
-
-	if action_menu_options.is_empty():
-		return ""
-
-	return action_menu_options[action_menu_index]
-
-# =========================
 # Cancels one action menu layer.
 #
 # Confirmation menus return to
@@ -1933,16 +1759,15 @@ func get_selected_action_menu_option() -> String:
 
 func cancel_action_menu_step():
 
+	var mode = action_menu_controller.get_mode()
+
 	if (
-		action_menu_mode == "confirm_attack"
-		or action_menu_mode == "confirm_wait"
-		or action_menu_mode == "confirm_support"
+		mode == "confirm_attack"
+		or mode == "confirm_wait"
+		or mode == "confirm_support"
 	):
 
-		action_menu_visible = false
-		action_menu_options.clear()
-		action_menu_index = 0
-		action_menu_mode = ""
+		action_menu_controller.close_menu()
 
 		keyboard_cursor_cell = pending_move_cell
 		keyboard_cursor_active = true
@@ -1954,74 +1779,63 @@ func cancel_action_menu_step():
 
 		pending_attack_target = -1
 		pending_support_target = -1
+		pending_facing_cell = Vector2i(-1, -1)
 
 		queue_redraw()
 
 # =========================
-# Handles action menu input.
+# Receives confirmed action
+# menu selections from the
+# ActionMenuController.
+#
+# Main remains responsible
+# for gameplay consequences,
+# while the controller only
+# manages UI/menu behavior.
 # =========================
 
-func handle_action_menu_input(event):
+func _on_action_menu_option_confirmed(option: String):
 
-	match event.keycode:
+	match option:
 
-		KEY_UP, KEY_W:
-			action_menu_index -= 1
+		"Attack":
+			action_menu_controller.close_menu()
+			confirm_attack()
 
-			if action_menu_index < 0:
-				action_menu_index = (
-					action_menu_options.size() - 1
-				)
+		"Wait":
+			action_menu_controller.close_menu()
 
-		KEY_DOWN, KEY_S:
-			action_menu_index += 1
+			if pending_facing_cell != Vector2i(-1, -1):
+				handle_facing_click(pending_facing_cell)
+			else:
+				confirm_wait()
 
-			if action_menu_index >= action_menu_options.size():
-				action_menu_index = 0
+		"Heal":
+			action_menu_controller.close_menu()
+			handle_heal_hotkey()
 
-		KEY_X:
-			cancel_action_menu_step()
+		"Regen":
+			action_menu_controller.close_menu()
+			handle_regen_hotkey()
 
-		KEY_Z:
-			action_menu_confirm_source = "keyboard"
-			confirm_action_menu_selection()
+		"Cancel":
+			_on_action_menu_cancelled()
 
-		KEY_ESCAPE:
-			cancel_action_menu_step()
-
-	update_action_menu()
 
 # =========================
-# Returns action menu option
-# index under mouse cursor.
+# Receives action menu
+# cancellation requests from
+# the ActionMenuController.
+#
+# Returns the player to the
+# previous tactical state
+# without fully clearing the
+# current unit's movement.
 # =========================
 
-func get_hovered_action_menu_index() -> int:
+func _on_action_menu_cancelled():
 
-	if not action_menu_visible:
-		return -1
-
-	var mouse_pos = get_viewport().get_mouse_position()
-
-	var labels = [
-		move_option_label,
-		attack_option_label,
-		heal_option_label,
-		wait_option_label
-	]
-
-	for i in range(action_menu_options.size()):
-
-		var label = labels[i]
-		var label_rect = Rect2(
-			label.global_position,
-			label.size
-		)
-
-		if label_rect.has_point(mouse_pos):
-			return i
-
-	return -1
+	cancel_action_menu_step()
 
 # =========================
 # Handles keyboard facing selection.
@@ -2059,42 +1873,6 @@ func handle_facing_selection_input(event):
 
 	handle_facing_click(facing_cell)
 
-# =========================
-# Confirms selected action menu option.
-# =========================
-
-func confirm_action_menu_selection():
-
-	if action_menu_options.is_empty():
-		return
-
-	var selected_option = action_menu_options[action_menu_index]
-
-	match selected_option:
-
-		"Attack":
-			action_menu_visible = false
-			confirm_attack()
-
-		"Wait":
-			action_menu_visible = false
-
-			if pending_facing_cell != Vector2i(-1, -1):
-				handle_facing_click(pending_facing_cell)
-			else:
-				confirm_wait()
-
-		"Heal":
-			action_menu_visible = false
-			handle_heal_hotkey()
-
-		"Regen":
-			action_menu_visible = false
-			handle_regen_hotkey()
-
-		"Cancel":
-			cancel_action_menu_step()
-
 # ==================================================
 # ENGINE CALLBACKS
 # ==================================================
@@ -2127,6 +1905,27 @@ func _ready():
 
 	phase_popup.visible = false
 
+	action_menu_controller.setup(
+		action_menu,
+		action_panel,
+		action_vbox,
+		[
+			move_option_label,
+			attack_option_label,
+			heal_option_label,
+			wait_option_label
+		],
+		map_data
+	)
+
+	action_menu_controller.option_confirmed.connect(
+		_on_action_menu_option_confirmed
+	)
+
+	action_menu_controller.menu_cancelled.connect(
+		_on_action_menu_cancelled
+	)
+
 	if FileAccess.file_exists(get_editor_map_path()):
 
 		map_serializer.load_map(
@@ -2155,7 +1954,13 @@ func _ready():
 func _process(_delta):
 
 	if input_locked:
-		update_action_menu()
+		action_menu_controller.sync_context(
+			units,
+			selected_unit,
+			pending_move_cell
+		)
+
+		action_menu_controller.update_menu()
 		queue_redraw()
 		return
 
@@ -2171,12 +1976,12 @@ func _process(_delta):
 		last_mouse_hover_cell = mouse_hover_cell
 
 	var suppress_map_hover = (
-		action_menu_visible
+		action_menu_controller.is_open()
 		and (
-			action_menu_mode == "destination"
-			or action_menu_mode == "confirm_attack"
-			or action_menu_mode == "confirm_wait"
-			or action_menu_mode == "confirm_support"
+			action_menu_controller.get_mode() == "destination"
+			or action_menu_controller.get_mode() == "confirm_attack"
+			or action_menu_controller.get_mode() == "confirm_wait"
+			or action_menu_controller.get_mode() == "confirm_support"
 		)
 	)
 
@@ -2189,18 +1994,17 @@ func _process(_delta):
 			hovered_cell = map_data.world_to_grid(mouse_pos)
 
 	update_hover_unit_panel()
-	update_action_menu()
 
-	if action_menu_visible:
+	action_menu_controller.sync_context(
+		units,
+		selected_unit,
+		pending_move_cell
+	)
 
-		var hovered_menu_index = get_hovered_action_menu_index()
+	action_menu_controller.update_menu()
 
-		if hovered_menu_index != -1:
-			action_menu_index = hovered_menu_index
-
-	# =========================
-	# Editor drag painting
-	# =========================
+	if action_menu_controller.is_open():
+		action_menu_controller.update_hovered_index_from_mouse()
 
 	if (
 		editor_mode
@@ -2215,15 +2019,10 @@ func _process(_delta):
 			selected_editor_tile
 		)
 
-	# =========================
-	# Normal movement path preview
-	# =========================
-
 	if (
 		not editor_mode
 		and not suppress_map_hover
 	):
-
 		hover_path_cells = path_preview_system.update_hover_path(
 			hover_path_cells,
 			map_data,
@@ -2278,8 +2077,8 @@ func handle_keyboard_input(event):
 		handle_facing_selection_input(event)
 		return
 
-	if action_menu_visible:
-		handle_action_menu_input(event)
+	if action_menu_controller.is_open():
+		action_menu_controller.handle_input(event)
 		return
 
 	if editor_resize_mode:
@@ -2586,24 +2385,10 @@ func handle_mouse_input(event):
 	if not event is InputEventMouseButton:
 		return
 
-	if action_menu_visible:
+	if action_menu_controller.is_open():
 
-		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-
-			var hovered_menu_index = get_hovered_action_menu_index()
-
-			if hovered_menu_index != -1:
-				action_menu_index = hovered_menu_index
-				action_menu_confirm_source = "mouse"
-				confirm_action_menu_selection()
-
+		if action_menu_controller.handle_mouse_click(event):
 			return
-
-		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-			cancel_action_menu_step()
-			return
-
-		return
 
 	# =========================
 	# Right click behavior
@@ -2643,18 +2428,6 @@ func handle_mouse_input(event):
 				)
 
 			queue_redraw()
-			return
-
-		if action_menu_visible:
-			cancel_action_menu_step()
-			return
-
-		if (
-			action_menu_mode == "confirm_attack"
-			or action_menu_mode == "confirm_wait"
-			or action_menu_mode == "confirm_support"
-		):
-			cancel_action_menu_step()
 			return
 
 		if inspected_unit_id != -1:
@@ -2879,15 +2652,19 @@ func handle_left_click():
 
 			pending_facing_cell = Vector2i(-1, -1)
 
-			action_menu_mode = "confirm_wait"
+			action_menu_controller.sync_context(
+				units,
+				selected_unit,
+				pending_move_cell
+			)
 
-			action_menu_options = [
-				"Wait",
-				"Cancel"
-			]
-
-			action_menu_index = 0
-			action_menu_visible = true
+			action_menu_controller.open_menu(
+				"confirm_wait",
+				[
+					"Wait",
+					"Cancel"
+				]
+			)
 
 			queue_redraw()
 			return
@@ -2919,16 +2696,21 @@ func handle_left_click():
 				awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
 
 				pending_attack_target = state["pending_attack_target"]
-				action_menu_mode = "confirm_support"
 
-				action_menu_options = [
-					"Heal",
-					"Regen",
-					"Cancel"
-				]
+				action_menu_controller.sync_context(
+					units,
+					selected_unit,
+					pending_move_cell
+				)
 
-				action_menu_index = 0
-				action_menu_visible = true
+				action_menu_controller.open_menu(
+					"confirm_support",
+					[
+						"Heal",
+						"Regen",
+						"Cancel"
+					]
+				)
 
 				queue_redraw()
 
@@ -2963,16 +2745,20 @@ func handle_left_click():
 				pending_support_target = state["pending_support_target"]
 				pending_facing_cell = clicked_cell
 
-				action_menu_mode = "confirm_attack"
+				action_menu_controller.sync_context(
+					units,
+					selected_unit,
+					pending_move_cell
+				)
 
-				action_menu_options = [
-					"Attack",
-					"Wait",
-					"Cancel"
-				]
-
-				action_menu_index = 0
-				action_menu_visible = true
+				action_menu_controller.open_menu(
+					"confirm_attack",
+					[
+						"Attack",
+						"Wait",
+						"Cancel"
+					]
+				)
 				
 				queue_redraw()
 
@@ -2996,15 +2782,19 @@ func handle_left_click():
 		):
 			pending_facing_cell = clicked_cell
 
-			action_menu_mode = "confirm_wait"
+			action_menu_controller.sync_context(
+				units,
+				selected_unit,
+				pending_move_cell
+			)
 
-			action_menu_options = [
-				"Wait",
-				"Cancel"
-			]
-
-			action_menu_index = 0
-			action_menu_visible = true
+			action_menu_controller.open_menu(
+				"confirm_wait",
+				[
+					"Wait",
+					"Cancel"
+				]
+			)
 
 			queue_redraw()
 			return
@@ -3023,15 +2813,19 @@ func handle_left_click():
 		):
 			pending_facing_cell = clicked_cell
 
-			action_menu_mode = "confirm_wait"
+			action_menu_controller.sync_context(
+				units,
+				selected_unit,
+				pending_move_cell
+			)
 
-			action_menu_options = [
-				"Wait",
-				"Cancel"
-			]
-
-			action_menu_index = 0
-			action_menu_visible = true
+			action_menu_controller.open_menu(
+				"confirm_wait",
+				[
+					"Wait",
+					"Cancel"
+				]
+			)
 
 			queue_redraw()
 			return
@@ -3101,9 +2895,7 @@ func clear_selection():
 	pending_coverage_enemies = state["pending_coverage_enemies"]
 	pending_facing_cell = Vector2i(-1, -1)
 
-	action_menu_visible = false
-	action_menu_options.clear()
-	action_menu_index = 0
+	action_menu_controller.close_menu()
 
 	hover_path_cells.clear()
 
@@ -3186,9 +2978,7 @@ func clear_pending_action_state():
 	pending_support_target = state["pending_support_target"]
 	pending_facing_cell = Vector2i(-1, -1)
 
-	action_menu_visible = false
-	action_menu_options.clear()
-	action_menu_index = 0
+	action_menu_controller.close_menu()
 
 	if keyboard_cursor_active and cursor_return_cell != Vector2i(-1, -1):
 		keyboard_cursor_cell = cursor_return_cell
@@ -3363,10 +3153,7 @@ func handle_move_tile_click(clicked_cell: Vector2i):
 	move_tiles.clear()
 	hover_path_cells.clear()
 
-	action_menu_visible = false
-	action_menu_options.clear()
-	action_menu_index = 0
-	action_menu_mode = ""
+	action_menu_controller.close_menu()
 
 	keyboard_cursor_cell = pending_move_cell
 	keyboard_cursor_active = true

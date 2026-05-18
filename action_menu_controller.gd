@@ -63,11 +63,16 @@ func sync_context(
 
 func open_menu(
 	new_mode: String,
-	new_options: Array[String],
+	new_options: Array,
 	start_index := 0
 ):
 	mode = new_mode
-	options = new_options
+
+	options.clear()
+
+	for option in new_options:
+		options.append(str(option))
+
 	index = start_index
 	menu_visible = true
 	update_menu()

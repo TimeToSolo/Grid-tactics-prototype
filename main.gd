@@ -65,7 +65,12 @@ extends Node2D
 @onready var render_system = $Systems/RenderSystem
 @onready var selection_state = $Systems/SelectionState
 @onready var selection_system = $Systems/SelectionSystem
+
 @onready var action_menu_controller = $Systems/ActionMenuController
+@onready var phase_popup_controller = $Systems/PhasePopupController
+@onready var tactical_input_controller = $Systems/TacticalInputController
+@onready var hover_unit_panel_controller = $Systems/HoverUnitPanelController
+@onready var post_move_action_flow = $Systems/PostMoveActionFlow
 
 # =========================
 # UI
@@ -81,12 +86,6 @@ extends Node2D
 @onready var hover_stamina_bar = $CanvasLayer/HoverUnitPanel/StaminaBar
 @onready var hover_hp_text_label = $CanvasLayer/HoverUnitPanel/HPTextLabel
 @onready var hover_stamina_text_label = $CanvasLayer/HoverUnitPanel/StaminaTextLabel
-
-@onready var phase_popup = $CanvasLayer/PhasePopup
-@onready var phase_panel = $CanvasLayer/PhasePopup/PhasePanel
-@onready var phase_label = $CanvasLayer/PhasePopup/PhasePanel/PhaseLabel
-
-@onready var phase_dim = $CanvasLayer/PhasePopup/ScreenDim
 
 @onready var action_menu = $CanvasLayer/ActionMenu
 @onready var action_panel = $CanvasLayer/ActionMenu/ActionPanel
@@ -1501,7 +1500,7 @@ func update_hover_unit_panel():
 			)
 		)
 	):
-		hover_unit_panel.visible = false
+		hover_unit_panel_controller.hide_panel()
 		return
 
 	var inspected_unit_index = -1
@@ -1534,118 +1533,16 @@ func update_hover_unit_panel():
 		display_unit = selected_unit
 
 	if display_unit == -1:
-		hover_unit_panel.visible = false
+		hover_unit_panel_controller.hide_panel()
 		return
 
 	if display_unit < 0 or display_unit >= units.size():
-		hover_unit_panel.visible = false
+		hover_unit_panel_controller.hide_panel()
 		return
 
-	var unit = units[display_unit]
-
-	var panel_style = StyleBoxFlat.new()
-
-	panel_style.bg_color = Color(0.008, 0.008, 0.212, 1.0)
-
-	panel_style.border_width_left = 4
-	panel_style.border_width_top = 4
-	panel_style.border_width_right = 4
-	panel_style.border_width_bottom = 4
-
-	panel_style.corner_radius_top_left = 8
-	panel_style.corner_radius_top_right = 8
-	panel_style.corner_radius_bottom_left = 8
-	panel_style.corner_radius_bottom_right = 8
-
-	if unit["team"] == "enemy":
-
-		panel_style.border_color = Color(0.9, 0.2, 0.2)
-
-		panel_style.bg_color = Color(0.028, 0.0, 0.0, 0.949)
-
-	else:
-
-		panel_style.border_color = Color(0.2, 0.45, 1.0)
-
-		panel_style.bg_color = Color(0.02,0.03,0.12,0.95)
-
-	hover_unit_panel.add_theme_stylebox_override(
-		"panel",
-		panel_style
-	)
-
-	hover_unit_panel.visible = true
-
-	hover_hp_text_label.position = Vector2(24, 56)
-	hover_hp_text_label.text = "HP"
-
-	hover_stamina_text_label.position = Vector2(24, 78)
-	hover_stamina_text_label.text = "STA"
-
-	# Match old drawn panel layout.
-	hover_unit_panel.position = Vector2(16, 16)
-	hover_unit_panel.size = Vector2(380, 112)
-
-	hover_unit_name_label.position = Vector2(24, 16)
-	hover_unit_name_label.text = unit["class"].capitalize()
-
-	var preview_hp = unit["hp"]
-
-	if preview_damage > 0:
-		preview_hp = max(unit["hp"] - preview_damage, 0)
-
-	hover_hp_value_label.position = Vector2(285, 18)
-	hover_hp_value_label.text = str(preview_hp) + "/" + str(unit["max_hp"])
-
-	var hp_bar_pos = Vector2(105, 56)
-	var hp_bar_size = Vector2(235, 22)
-
-	var hp_percent = float(preview_hp) / float(unit["max_hp"])
-	var hp_fill_width = hp_bar_size.x * hp_percent
-
-	var current_percent = float(unit["hp"]) / float(unit["max_hp"])
-	var current_fill_width = hp_bar_size.x * current_percent
-
-	hover_hp_back_bar.position = hp_bar_pos
-	hover_hp_back_bar.size = hp_bar_size
-	hover_hp_back_bar.color = Color(0.12, 0.12, 0.12, 1.0)
-
-	hover_hp_bar.position = hp_bar_pos
-	hover_hp_bar.size = Vector2(hp_fill_width, hp_bar_size.y)
-
-	if unit["team"] == "enemy":
-		hover_hp_bar.color = Color(0.85, 0.2, 0.2)
-	else:
-		hover_hp_bar.color = Color(0.2, 0.85, 0.2)
-
-	var damage_width = current_fill_width - hp_fill_width
-
-	if preview_damage > 0 and damage_width > 0:
-		hover_hp_preview_bar.visible = true
-		hover_hp_preview_bar.position = Vector2(
-			hp_bar_pos.x + hp_fill_width,
-			hp_bar_pos.y
-		)
-		hover_hp_preview_bar.size = Vector2(damage_width, hp_bar_size.y)
-		hover_hp_preview_bar.color = Color(1.0, 0.9, 0.0, 0.95)
-	else:
-		hover_hp_preview_bar.visible = false
-
-	var stamina_bar_pos = Vector2(105, 86)
-	var stamina_bar_size = Vector2(150, 12)
-
-	var stamina_percent = float(unit["stamina"]) / float(unit["max_stamina"])
-	var stamina_fill_width = stamina_bar_size.x * stamina_percent
-
-	hover_stamina_bar.position = stamina_bar_pos
-	hover_stamina_bar.size = Vector2(stamina_fill_width, stamina_bar_size.y)
-	hover_stamina_bar.color = Color(0.95, 0.65, 0.18)
-
-	hover_stamina_value_label.position = Vector2(260, 78)
-	hover_stamina_value_label.text = (
-		str(unit["stamina"])
-		+ "/"
-		+ str(unit["max_stamina"])
+	hover_unit_panel_controller.update_panel(
+		units[display_unit],
+		preview_damage
 	)
 
 # =========================
@@ -1654,101 +1551,11 @@ func update_hover_unit_panel():
 
 func show_phase_popup(custom_text: String = ""):
 
-	var phase_text = custom_text
-
-	if phase_text == "":
-		phase_text = "Player Phase"
-
-		if turn_manager.current_team == "enemy":
-			phase_text = "Enemy Phase"
-
-	if custom_text != "":
-		phase_label.text = phase_text
-	else:
-		phase_label.text = phase_text + "  |  Turn " + str(turn_number)
-
-	var is_enemy_phase = (
-		phase_text == "Enemy Phase"
+	await phase_popup_controller.show_phase_popup(
+		turn_manager.current_team,
+		turn_number,
+		custom_text
 	)
-
-	var phase_border_color = Color(0.2, 0.45, 1.0)
-	var phase_bg_color = Color(0.0, 0.02, 0.08, 0.95)
-	var phase_text_color = Color(0.45, 0.7, 1.0)
-
-	if is_enemy_phase:
-		phase_border_color = Color(0.9, 0.2, 0.2)
-		phase_bg_color = Color(0.03, 0.0, 0.0, 0.95)
-		phase_text_color = Color(1.0, 0.25, 0.25)
-
-	phase_label.add_theme_color_override(
-		"font_color",
-		phase_text_color
-	)
-
-	var viewport_size = get_viewport_rect().size
-	var popup_size = Vector2(620, 120)
-
-	phase_popup.position = Vector2.ZERO
-	phase_popup.size = viewport_size
-
-	phase_dim.position = Vector2.ZERO
-	phase_dim.size = viewport_size
-
-	if custom_text == "Battle Commence":
-		phase_dim.visible = true
-		phase_dim.color = Color(0.0, 0.0, 0.0, 0.35)
-	else:
-		phase_dim.visible = false
-
-	phase_panel.size = popup_size
-	phase_panel.position = (viewport_size - popup_size) / 2.0
-
-	phase_label.size = popup_size
-	phase_label.position = Vector2.ZERO
-	phase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	phase_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-
-	var panel_style = StyleBoxFlat.new()
-	panel_style.bg_color = phase_bg_color
-	panel_style.border_color = phase_border_color
-
-	panel_style.border_width_left = 4
-	panel_style.border_width_top = 4
-	panel_style.border_width_right = 4
-	panel_style.border_width_bottom = 4
-
-	panel_style.corner_radius_top_left = 14
-	panel_style.corner_radius_top_right = 14
-	panel_style.corner_radius_bottom_left = 14
-	panel_style.corner_radius_bottom_right = 14
-
-	phase_panel.add_theme_stylebox_override(
-		"panel",
-		panel_style
-	)
-
-	phase_popup.visible = true
-	phase_popup.modulate.a = 1.0
-
-	var tween = create_tween()
-
-	tween.tween_interval(1.25)
-
-	tween.tween_property(
-		phase_popup,
-		"modulate:a",
-		0.0,
-		0.55
-	)
-
-	tween.tween_callback(
-		func():
-			phase_popup.visible = false
-			phase_dim.visible = false
-			phase_popup.modulate.a = 1.0
-	)
-
-	await tween.finished
 
 # =========================
 # Cancels one action menu layer.
@@ -1782,6 +1589,60 @@ func cancel_action_menu_step():
 		pending_facing_cell = Vector2i(-1, -1)
 
 		queue_redraw()
+
+# =========================
+# Applies post-move action
+# menu state returned by
+# PostMoveActionFlow.
+#
+# Transfers confirmation
+# state data into Main's
+# gameplay state, then opens
+# the appropriate action menu.
+#
+# PostMoveActionFlow decides
+# WHAT menu should appear.
+#
+# Main remains responsible
+# for owning gameplay state
+# and action consequences.
+# =========================
+
+func apply_post_move_menu_state(state: Dictionary):
+
+	if state.is_empty():
+		return
+
+	if state.has("pending_attack_target"):
+		pending_attack_target = state["pending_attack_target"]
+
+	if state.has("pending_support_target"):
+		pending_support_target = state["pending_support_target"]
+
+	if state.has("awaiting_attack_confirmation"):
+		awaiting_attack_confirmation = state["awaiting_attack_confirmation"]
+
+	if state.has("awaiting_support_confirmation"):
+		awaiting_support_confirmation = state["awaiting_support_confirmation"]
+
+	if state.has("awaiting_wait_confirmation"):
+		awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
+
+	if state.has("pending_facing_cell"):
+		pending_facing_cell = state["pending_facing_cell"]
+
+	action_menu_controller.sync_context(
+		units,
+		selected_unit,
+		pending_move_cell
+	)
+
+	action_menu_controller.open_menu(
+		state["mode"],
+		state["options"]
+	)
+
+	queue_redraw()
 
 # =========================
 # Receives confirmed action
@@ -1903,8 +1764,6 @@ func start_battle_flow():
 
 func _ready():
 
-	phase_popup.visible = false
-
 	action_menu_controller.setup(
 		action_menu,
 		action_panel,
@@ -1925,6 +1784,26 @@ func _ready():
 	action_menu_controller.menu_cancelled.connect(
 		_on_action_menu_cancelled
 	)
+
+	hover_unit_panel_controller.setup(
+		hover_unit_panel,
+		hover_unit_name_label,
+		hover_hp_value_label,
+		hover_hp_back_bar,
+		hover_hp_bar,
+		hover_hp_preview_bar,
+		hover_stamina_value_label,
+		hover_stamina_bar,
+		hover_hp_text_label,
+		hover_stamina_text_label
+	)
+
+	tactical_input_controller.cursor_moved.connect(move_keyboard_cursor)
+	tactical_input_controller.keyboard_confirm_requested.connect(handle_keyboard_confirm)
+	tactical_input_controller.keyboard_cancel_requested.connect(cancel_pending_action)
+	tactical_input_controller.end_turn_requested.connect(end_current_turn)
+	tactical_input_controller.coverage_cycle_requested.connect(cycle_coverage_mode)
+	tactical_input_controller.tab_cycle_requested.connect(jump_to_next_unmoved_ally)
 
 	if FileAccess.file_exists(get_editor_map_path()):
 
@@ -2085,26 +1964,9 @@ func handle_keyboard_input(event):
 		handle_editor_resize_input(event)
 		return
 
-	match event.keycode:
-
-		KEY_UP, KEY_W:
-			move_keyboard_cursor(Vector2i.UP)
+	if not editor_mode:
+		if tactical_input_controller.handle_keyboard_event(event):
 			return
-
-		KEY_LEFT, KEY_A:
-			move_keyboard_cursor(Vector2i.LEFT)
-			return
-
-		KEY_DOWN, KEY_S:
-			move_keyboard_cursor(Vector2i.DOWN)
-			return
-
-		KEY_RIGHT, KEY_D:
-			move_keyboard_cursor(Vector2i.RIGHT)
-			return
-
-		KEY_Z:
-			handle_keyboard_confirm()
 
 	match event.keycode:
 
@@ -2646,189 +2508,21 @@ func handle_left_click():
 
 	if selected_unit != -1 and has_pending_move():
 
-		# Clicking the moved unit opens a simple
-		# post-move self-action menu.
-		if clicked_cell == pending_move_cell:
-
-			pending_facing_cell = Vector2i(-1, -1)
-
-			action_menu_controller.sync_context(
-				units,
-				selected_unit,
-				pending_move_cell
-			)
-
-			action_menu_controller.open_menu(
-				"confirm_wait",
-				[
-					"Wait",
-					"Cancel"
-				]
-			)
-
-			queue_redraw()
-			return
-
-		if action_query.should_handle_heal_click(
-			units,
-			selected_unit,
-			pending_move_cell,
-			hovered_cell,
-			has_pending_move(),
-			unit_logic,
-			unit_query,
-			hover_query,
-			map_data
-		):
-			var state = action_system.get_support_confirmation_state(
-				units,
-				selected_unit,
-				clicked_cell,
-				unit_query
-			)
-
-			if not state.is_empty():
-
-				pending_support_target = state["pending_support_target"]
-
-				awaiting_support_confirmation = state["awaiting_support_confirmation"]
-				awaiting_attack_confirmation = state["awaiting_attack_confirmation"]
-				awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
-
-				pending_attack_target = state["pending_attack_target"]
-
-				action_menu_controller.sync_context(
-					units,
-					selected_unit,
-					pending_move_cell
-				)
-
-				action_menu_controller.open_menu(
-					"confirm_support",
-					[
-						"Heal",
-						"Regen",
-						"Cancel"
-					]
-				)
-
-				queue_redraw()
-
-			return
-
-		if action_query.should_handle_attack_click(
-			units,
-			selected_unit,
-			pending_move_cell,
-			hovered_cell,
-			has_pending_move(),
-			unit_logic,
-			unit_query,
-			hover_query,
-			map_data
-		):
-			var state = action_system.get_attack_confirmation_state(
-				units,
-				selected_unit,
-				clicked_cell,
-				unit_query
-			)
-
-			if not state.is_empty():
-
-				pending_attack_target = state["pending_attack_target"]
-
-				awaiting_attack_confirmation = state["awaiting_attack_confirmation"]
-				awaiting_support_confirmation = state["awaiting_support_confirmation"]
-				awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
-
-				pending_support_target = state["pending_support_target"]
-				pending_facing_cell = clicked_cell
-
-				action_menu_controller.sync_context(
-					units,
-					selected_unit,
-					pending_move_cell
-				)
-
-				action_menu_controller.open_menu(
-					"confirm_attack",
-					[
-						"Attack",
-						"Wait",
-						"Cancel"
-					]
-				)
-				
-				queue_redraw()
-
-			return
-
-		if (
-			action_query.is_clicking_empty_action_tile(
-				units,
-				selected_unit,
-				clicked_cell,
-				pending_move_cell,
-				has_pending_move(),
-				unit_logic,
-				unit_query,
-				map_data
-			)
-			and (
-				units[selected_unit]["class"] == "archer"
-				or units[selected_unit]["class"] == "healer"
-			)
-		):
-			pending_facing_cell = clicked_cell
-
-			action_menu_controller.sync_context(
-				units,
-				selected_unit,
-				pending_move_cell
-			)
-
-			action_menu_controller.open_menu(
-				"confirm_wait",
-				[
-					"Wait",
-					"Cancel"
-				]
-			)
-
-			queue_redraw()
-			return
-
-		if action_query.should_handle_facing_click(
+		var menu_state = post_move_action_flow.get_post_move_menu_state(
 			units,
 			selected_unit,
 			clicked_cell,
 			pending_move_cell,
-			hovered_cell,
-			has_pending_move(),
+			action_query,
+			action_system,
 			unit_logic,
 			unit_query,
 			hover_query,
 			map_data
-		):
-			pending_facing_cell = clicked_cell
+		)
 
-			action_menu_controller.sync_context(
-				units,
-				selected_unit,
-				pending_move_cell
-			)
-
-			action_menu_controller.open_menu(
-				"confirm_wait",
-				[
-					"Wait",
-					"Cancel"
-				]
-			)
-
-			queue_redraw()
-			return
+		if not menu_state.is_empty():
+			apply_post_move_menu_state(menu_state)
 
 		return
 

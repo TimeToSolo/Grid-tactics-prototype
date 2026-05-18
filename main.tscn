@@ -22,6 +22,10 @@
 [ext_resource type="Script" uid="uid://dikivmag3p7lf" path="res://map_serializer.gd" id="20_82xsv"]
 [ext_resource type="Script" uid="uid://d2r7naq6y7lrm" path="res://ai_system.gd" id="21_getpj"]
 [ext_resource type="Script" uid="uid://dr6mq6wnlr3h8" path="res://action_menu_controller.gd" id="22_ryguw"]
+[ext_resource type="Script" uid="uid://crtkpkheu4oj6" path="res://phase_popup_controller.gd" id="23_d13ii"]
+[ext_resource type="Script" uid="uid://b48nxfwojqhsg" path="res://tactical_input_controller.gd" id="24_1u8w0"]
+[ext_resource type="Script" uid="uid://cy23qsg554ty6" path="res://hover_unit_panel_controller.gd" id="25_0odxb"]
+[ext_resource type="Script" uid="uid://cmhyvudy3ofcp" path="res://post_move_action_flow.gd" id="26_lswn8"]
 
 [node name="Main" type="Node2D" unique_id=370152938]
 script = ExtResource("1_ig7tw")
@@ -96,6 +100,18 @@ script = ExtResource("13_ycdy4")
 
 [node name="ActionMenuController" type="Node" parent="Systems" unique_id=45933120]
 script = ExtResource("22_ryguw")
+
+[node name="PhasePopupController" type="Node" parent="Systems" unique_id=165724395]
+script = ExtResource("23_d13ii")
+
+[node name="TacticalInputController" type="Node" parent="Systems" unique_id=1337470958]
+script = ExtResource("24_1u8w0")
+
+[node name="HoverUnitPanelController" type="Node" parent="Systems" unique_id=425695357]
+script = ExtResource("25_0odxb")
+
+[node name="PostMoveActionFlow" type="Node" parent="Systems" unique_id=2052915096]
+script = ExtResource("26_lswn8")
 
 [node name="CanvasLayer" type="Node" parent="." unique_id=1191476634]
 

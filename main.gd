@@ -59,6 +59,7 @@ extends Node2D
 @onready var map_serializer = $Systems/MapSerializer
 @onready var movement_system = $Systems/MovementSystem
 @onready var mission_flow_controller = $Systems/MissionFlowController
+@onready var mission_objectives = $Systems/MissionObjectives
 @onready var path_preview_system = $Systems/PathPreviewSystem
 @onready var render_system = $Systems/RenderSystem
 @onready var selection_state = $Systems/SelectionState
@@ -230,6 +231,8 @@ var selected_editor_ai_profile := "barbarian"
 
 var selected_editor_unit := -1
 
+var editor_reinforcement_stage := 1
+
 var editor_unit_move_dragging := false
 var editor_unit_move_start_cell: Vector2i = Vector2i(-1, -1)
 
@@ -380,7 +383,8 @@ func save_editor_map():
 	map_serializer.save_map(
 		map_data,
 		units,
-		get_editor_map_path()
+		get_editor_map_path(),
+		current_objective_data
 	)
 
 # =========================
@@ -389,7 +393,7 @@ func save_editor_map():
 
 func load_editor_map():
 
-	map_serializer.load_map(
+	current_objective_data = map_serializer.load_map(
 		map_data,
 		units,
 		unit_data,
@@ -405,12 +409,14 @@ func load_editor_map():
 
 func save_campaign_level():
 
+	update_current_objective_from_editor()
+
 	map_serializer.save_map(
 		map_data,
 		units,
-		mission_flow_controller.get_campaign_level_path()
+		mission_flow_controller.get_campaign_level_path(),
+		current_objective_data
 	)
-
 
 # =========================
 # Loads current repository
@@ -419,7 +425,7 @@ func save_campaign_level():
 
 func load_campaign_level():
 
-	map_serializer.load_map(
+	current_objective_data = map_serializer.load_map(
 		map_data,
 		units,
 		unit_data,
@@ -564,6 +570,23 @@ var coverage_mode = 0
 
 # Current displayed turn number.
 var turn_number = 1
+
+# Player extraction area for
+# retreat-style objectives.
+var player_start_area: Array[Vector2i] = []
+
+var current_objective_data := {}
+var editor_objective_type := "retreat"
+var editor_required_enemy_defeats := -1
+
+# True when reinforcements
+# should spawn after the
+# current enemy phase ends.
+var pending_reinforcement_spawn := false
+
+var pending_reinforcement_stage := -1
+
+var staged_reinforcements: Array = []
 
 # =========================
 # Draws destination preview
@@ -783,6 +806,16 @@ func draw_editor_ui():
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(x + 310, palette_y),
+		"Reinf",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_size,
+		Color.ORANGE if editor_palette == "reinforcement" else Color.WHITE
+	)
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(x + 420, palette_y),
 		"Select",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
@@ -825,6 +858,7 @@ func draw_editor_ui():
 	elif (
 		editor_palette == "player_unit"
 		or editor_palette == "enemy_unit"
+		or editor_palette == "reinforcement"
 	):
 
 		draw_string(
@@ -969,6 +1003,22 @@ func draw_editor_ui():
 			Color.WHITE
 		)
 
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(x + 620, facing_y),
+			(
+				"Objective: "
+				+ editor_objective_type
+				+ " | Kills: "
+				+ str(editor_required_enemy_defeats)
+				+ " [7/8]"
+			),
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			font_size,
+			Color.YELLOW
+		)
+
 # =========================
 # Rotates editor unit facing
 # clockwise through 8 directions.
@@ -1013,6 +1063,8 @@ func cycle_editor_palette():
 	elif editor_palette == "player_unit":
 		editor_palette = "enemy_unit"
 	elif editor_palette == "enemy_unit":
+		editor_palette = "reinforcement"
+	elif editor_palette == "reinforcement":
 		editor_palette = "select"
 	else:
 		editor_palette = "terrain"
@@ -1239,6 +1291,7 @@ func _draw():
 	draw_all_defender_leashes()
 	draw_selected_editor_unit_leash()
 	draw_editor_unit_move_preview()
+	draw_editor_reinforcement_markers()
 	draw_editor_move_preview()
 	draw_editor_ui()
 	draw_editor_resize_ui()
@@ -1339,6 +1392,46 @@ func draw_editor_unit_move_preview():
 		map_data.grid_rect(target_cell),
 		Color(1.0, 1.0, 0.0, 0.45)
 	)
+
+# =========================
+# Draws reinforcement markers
+# on staged editor units.
+# =========================
+
+func draw_editor_reinforcement_markers():
+
+	if not editor_mode:
+		return
+
+	for unit in units:
+
+		if not unit.has("starts_hidden"):
+			continue
+
+		if not unit["starts_hidden"]:
+			continue
+
+		var marker_pos = (
+			map_data.grid_rect(unit["pos"]).position
+			+ Vector2(6, 58)
+		)
+
+		draw_rect(
+			map_data.grid_rect(unit["pos"]),
+			Color(0.25, 0.0, 0.35, 0.65),
+			false,
+			5
+		)
+
+		draw_string(
+			ThemeDB.fallback_font,
+			marker_pos,
+			"R" + str(unit["reinforcement_stage"]),
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			16,
+			Color(0.15, 0.15, 0.15)
+		)
 
 # =========================
 # Draws leash range preview
@@ -1771,6 +1864,7 @@ func handle_facing_selection_input(event):
 # =========================
 
 func start_battle_flow():
+	input_locked = false
 
 	turn_number = 1
 	turn_manager.current_team = "player"
@@ -1778,6 +1872,7 @@ func start_battle_flow():
 	for unit in units:
 		unit["has_acted"] = false
 
+	remove_hidden_reinforcements_from_active_battle()
 	clear_selection()
 	initialize_keyboard_cursor()
 	queue_redraw()
@@ -1786,10 +1881,223 @@ func start_battle_flow():
 	await show_phase_popup()
 
 # =========================
+# Loads the currently
+# selected campaign mission.
+#
+# Retrieves mission metadata
+# from MissionFlowController,
+# loads the associated map,
+# then begins battle flow.
+#
+# Future expansion:
+# - VN intro scenes
+# - deployment phase
+# - mission objectives
+# - music setup
+# - cutscene transitions
+# =========================
+
+func load_current_campaign_mission():
+
+	var mission_data = (
+		mission_flow_controller
+		.get_current_mission_data()
+	)
+
+	mission_flow_controller.set_mission_state("battle")
+
+	current_objective_data = map_serializer.load_map(
+		map_data,
+		units,
+		unit_data,
+		mission_flow_controller.get_campaign_level_path()
+	)
+
+	setup_current_mission_objective()
+	await start_battle_flow()
+
+# =========================
+# Stores player starting
+# positions as retreat
+# extraction tiles.
+# =========================
+
+func cache_player_start_area():
+
+	player_start_area.clear()
+
+	for unit in units:
+
+		if unit["team"] != "player":
+			continue
+
+		player_start_area.append(unit["pos"])
+
+# =========================
+# Sets up objective state
+# for the current mission.
+# =========================
+
+func setup_current_mission_objective():
+
+	if current_objective_data.is_empty():
+		current_objective_data = {
+			"type": mission_flow_controller.get_current_objective_type()
+		}
+
+	mission_objectives.setup_objective(
+		current_objective_data
+	)
+
+	if current_objective_data["type"] == "retreat":
+		cache_player_start_area()
+
+# =========================
+# Updates current objective
+# data from editor settings.
+# =========================
+
+func update_current_objective_from_editor():
+
+	current_objective_data = {
+		"type": editor_objective_type
+	}
+
+	if editor_required_enemy_defeats >= 0:
+
+		current_objective_data[
+			"initial_enemy_defeat_count"
+		] = editor_required_enemy_defeats
+
+# =========================
+# Spawns queued mission
+# reinforcements.
+# =========================
+
+func spawn_reinforcements():
+
+	for reinforcement in staged_reinforcements:
+
+		if not reinforcement.has("reinforcement_stage"):
+			continue
+
+		if reinforcement["reinforcement_stage"] != pending_reinforcement_stage:
+			continue
+
+		reinforcement.erase("starts_hidden")
+
+		var new_unit_index = units.size()
+
+		units.append(reinforcement)
+
+		await animate_reinforcement_entry(
+			new_unit_index,
+			-reinforcement["facing"]
+		)
+
+	pending_reinforcement_stage = -1
+
+	queue_redraw()
+
+# =========================
+# Removes staged reinforcement
+# units from active battle
+# until their trigger occurs.
+# =========================
+
+func remove_hidden_reinforcements_from_active_battle():
+
+	staged_reinforcements.clear()
+
+	for i in range(units.size() - 1, -1, -1):
+
+		if not units[i].has("starts_hidden"):
+			continue
+
+		if not units[i]["starts_hidden"]:
+			continue
+
+		staged_reinforcements.append(
+			units[i].duplicate(true)
+		)
+
+		units.remove_at(i)
+
+# =========================
+# Spawns queued reinforcements
+# after enemy phase ends.
+# =========================
+
+func resolve_pending_reinforcements():
+
+	if not pending_reinforcement_spawn:
+		return
+
+	pending_reinforcement_spawn = false
+
+	await spawn_reinforcements()
+
+# =========================
+# Handles mission victory flow.
+# =========================
+
+func handle_mission_victory():
+
+	input_locked = true
+
+	mission_flow_controller.set_mission_state(
+		"victory"
+	)
+
+	await show_phase_popup("Victory")
+
+	await get_tree().create_timer(0.8).timeout
+
+	if not mission_flow_controller.is_final_mission():
+
+		mission_flow_controller.advance_to_next_mission()
+
+		await load_current_campaign_mission()
+
+	else:
+
+		print("Campaign Complete")
+
+# =========================
+# Handles mission defeat flow.
+# =========================
+
+func handle_mission_defeat():
+
+	input_locked = true
+
+	mission_flow_controller.set_mission_state(
+		"defeat"
+	)
+
+	await show_phase_popup("Defeat")
+
+	await get_tree().create_timer(0.8).timeout
+
+	await load_current_campaign_mission()
+
+# =========================
 # Initial setup.
 # =========================
 
+# =========================
+# Initializes controllers,
+# connects UI signals,
+# loads startup battle data,
+# and prepares initial
+# game state.
+# =========================
+
 func _ready():
+
+	# =========================
+	# Action menu setup
+	# =========================
 
 	action_menu_controller.setup(
 		action_menu,
@@ -1812,6 +2120,10 @@ func _ready():
 		_on_action_menu_cancelled
 	)
 
+	# =========================
+	# Hover UI setup
+	# =========================
+
 	hover_unit_panel_controller.setup(
 		hover_unit_panel,
 		hover_unit_name_label,
@@ -1825,12 +2137,20 @@ func _ready():
 		hover_stamina_text_label
 	)
 
+	# =========================
+	# Tactical input signals
+	# =========================
+
 	tactical_input_controller.cursor_moved.connect(move_keyboard_cursor)
 	tactical_input_controller.keyboard_confirm_requested.connect(handle_keyboard_confirm)
 	tactical_input_controller.keyboard_cancel_requested.connect(cancel_pending_action)
 	tactical_input_controller.end_turn_requested.connect(end_current_turn)
 	tactical_input_controller.coverage_cycle_requested.connect(cycle_coverage_mode)
 	tactical_input_controller.tab_cycle_requested.connect(jump_to_next_unmoved_ally)
+
+	# =========================
+	# Initial map loading
+	# =========================
 
 	if FileAccess.file_exists(get_editor_map_path()):
 
@@ -1848,6 +2168,10 @@ func _ready():
 		units = battle_setup.create_battle_units(
 			unit_data
 		)
+
+	# =========================
+	# Initial battle state
+	# =========================
 
 	initialize_keyboard_cursor()
 
@@ -2000,14 +2324,11 @@ func handle_keyboard_input(event):
 				cycle_editor_ai_profile()
 
 		KEY_E:
-
 			editor_mode = !editor_mode
-
 			clear_pending_action_state()
-
 			if not editor_mode:
+				setup_current_mission_objective()
 				await start_battle_flow()
-
 			queue_redraw()
 
 		KEY_F:
@@ -2040,6 +2361,10 @@ func handle_keyboard_input(event):
 		KEY_F10:
 			if editor_mode:
 				load_campaign_level()
+
+		KEY_F11:
+			if editor_mode:
+				load_current_campaign_mission()
 
 		KEY_COMMA:
 			if editor_mode:
@@ -2133,6 +2458,19 @@ func handle_keyboard_input(event):
 			if editor_palette != "terrain":
 				selected_editor_unit_class = "archer"
 				validate_selected_editor_ai_profile()
+				queue_redraw()
+
+		KEY_7:
+			if editor_mode:
+				editor_required_enemy_defeats = max(
+					-1,
+					editor_required_enemy_defeats - 1
+				)
+				queue_redraw()
+
+		KEY_8:
+			if editor_mode:
+				editor_required_enemy_defeats += 1
 				queue_redraw()
 
 		KEY_C:
@@ -2546,6 +2884,29 @@ func handle_left_click():
 				selected_editor_ai_profile
 			)
 
+		elif editor_palette == "reinforcement":
+
+			editor_system.place_unit(
+				units,
+				unit_query,
+				unit_data,
+				map_data,
+				clicked_cell,
+				selected_editor_unit_class,
+				"enemy",
+				selected_editor_facing,
+				selected_editor_ai_profile
+			)
+
+			var placed_unit = unit_query.get_unit_at(
+				units,
+				clicked_cell
+			)
+
+			if placed_unit != -1:
+				units[placed_unit]["reinforcement_stage"] = editor_reinforcement_stage
+				units[placed_unit]["starts_hidden"] = true
+
 		queue_redraw()
 		return
 
@@ -2944,6 +3305,40 @@ func handle_facing_click(clicked_cell: Vector2i):
 	await start_ai_turn_if_needed()
 
 # =========================
+# Checks whether current
+# mission has ended.
+#
+# MissionObjectives determines
+# the mission result.
+#
+# Main applies the resulting
+# campaign flow.
+# =========================
+
+func check_mission_end_conditions():
+
+	if mission_flow_controller.get_mission_state() != "battle":
+		return
+
+	var mission_result = (
+		mission_objectives
+		.get_mission_result(units, player_start_area)
+	)
+
+	if mission_result == "spawn_reinforcements":
+		pending_reinforcement_spawn = true
+		pending_reinforcement_stage = mission_objectives.get_objective_stage()
+		return
+
+	if mission_result == "victory":
+		await handle_mission_victory()
+		return
+
+	if mission_result == "defeat":
+		await handle_mission_defeat()
+		return
+
+# =========================
 # Confirms pending attack.
 #
 # Movement is finalized first.
@@ -2978,6 +3373,8 @@ func confirm_attack():
 		return
 
 	if result["defender_died"]:
+		if units[result["defender_remove_index"]]["team"] == "enemy":
+			mission_objectives.record_enemy_defeated()
 		units.remove_at(result["defender_remove_index"])
 
 	clear_selection()
@@ -2990,6 +3387,10 @@ func confirm_attack():
 	)
 
 	queue_redraw()
+	await check_mission_end_conditions()
+	if pending_reinforcement_spawn:
+		await resolve_pending_reinforcements()
+		return
 	await start_ai_turn_if_needed()
 
 # =========================
@@ -3035,6 +3436,7 @@ func confirm_wait():
 	)
 
 	queue_redraw()
+	await check_mission_end_conditions()
 	await start_ai_turn_if_needed()
 
 # =========================
@@ -3079,6 +3481,7 @@ func confirm_support_action(
 	)
 
 	queue_redraw()
+	await check_mission_end_conditions()
 	await start_ai_turn_if_needed()
 
 # ==================================================
@@ -3225,12 +3628,17 @@ func process_ai_turn_if_needed():
 	turn_manager.end_turn(units)
 
 	if turn_manager.current_team == "player":
+
+		await resolve_pending_reinforcements()
+
 		turn_number += 1
 
 	clear_selection()
 	inspected_unit_id = -1
 
 	queue_redraw()
+
+	await check_mission_end_conditions()
 
 	await show_phase_popup()
 
@@ -3287,6 +3695,58 @@ func animate_unit_path(
 		await get_tree().create_timer(0.02).timeout
 
 	units[unit_index]["facing"] = original_facing
+	queue_redraw()
+
+# =========================
+# Animates a newly spawned
+# reinforcement walking into
+# its target tile.
+#
+# The unit already exists at
+# its final logical position.
+# draw_offset creates the
+# visual entrance motion.
+# =========================
+
+func animate_reinforcement_entry(
+	unit_index: int,
+	entry_direction: Vector2i
+):
+
+	if unit_index == -1:
+		return
+
+	if unit_index >= units.size():
+		return
+
+	var final_facing = units[unit_index]["facing"]
+
+	units[unit_index]["facing"] = Vector2i.ZERO
+
+	var start_offset = Vector2(
+		entry_direction.x,
+		entry_direction.y
+	) * map_data.TILE_SIZE * 1.5
+
+	units[unit_index]["draw_offset"] = start_offset
+
+	var steps = 8
+
+	for step in range(steps):
+
+		var t = float(step + 1) / float(steps)
+
+		units[unit_index]["draw_offset"] = start_offset.lerp(
+			Vector2.ZERO,
+			t
+		)
+
+		queue_redraw()
+		await get_tree().create_timer(0.04).timeout
+
+	units[unit_index]["draw_offset"] = Vector2.ZERO
+	units[unit_index]["facing"] = final_facing
+
 	queue_redraw()
 
 # =========================

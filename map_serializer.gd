@@ -8,19 +8,21 @@ extends Node
 func save_map(
 	map_data,
 	units: Array,
-	file_path: String
+	file_path: String,
+	objective_data: Dictionary = {}
 ):
 
 	var save_data = {
 		"width": map_data.grid_width,
 		"height": map_data.grid_height,
 		"terrain_map": map_data.terrain_map,
+		"objective": objective_data,
 		"units": []
 	}
 
 	for unit in units:
 
-		save_data["units"].append({
+		var saved_unit = {
 			"class": unit["class"],
 			"team": unit["team"],
 			"ai_profile": unit["ai_profile"],
@@ -33,7 +35,15 @@ func save_map(
 			"home_facing_x": unit["home_facing"].x,
 			"home_facing_y": unit["home_facing"].y,
 			"leash_range": unit["leash_range"]
-		})
+		}
+
+		if unit.has("starts_hidden"):
+			saved_unit["starts_hidden"] = unit["starts_hidden"]
+
+		if unit.has("reinforcement_stage"):
+			saved_unit["reinforcement_stage"] = unit["reinforcement_stage"]
+
+		save_data["units"].append(saved_unit)
 
 	DirAccess.make_dir_recursive_absolute("user://maps")
 
@@ -123,6 +133,17 @@ func load_map(
 		if unit_info.has("leash_range"):
 			unit["leash_range"] = unit_info["leash_range"]
 
+		if unit_info.has("starts_hidden"):
+			unit["starts_hidden"] = unit_info["starts_hidden"]
+
+		if unit_info.has("reinforcement_stage"):
+			unit["reinforcement_stage"] = int(unit_info["reinforcement_stage"])
+
 		units.append(unit)
 
 	print("Loaded map from: ", file_path)
+
+	if data.has("objective"):
+		return data["objective"]
+
+	return {}

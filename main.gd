@@ -31,7 +31,6 @@ extends Node2D
 @onready var map_data = $Data/MapData
 @onready var unit_data = $Data/UnitData
 
-
 # =========================
 # LOGIC
 # =========================
@@ -41,7 +40,6 @@ extends Node2D
 @onready var turn_manager = $Logic/TurnManager
 @onready var unit_logic = $Logic/UnitLogic
 
-
 # =========================
 # QUERIES
 # =========================
@@ -49,7 +47,6 @@ extends Node2D
 @onready var action_query = $Queries/ActionQuery
 @onready var hover_query = $Queries/HoverQuery
 @onready var unit_query = $Queries/UnitQuery
-
 
 # =========================
 # SYSTEMS
@@ -95,7 +92,6 @@ extends Node2D
 @onready var attack_option_label = $CanvasLayer/ActionMenu/ActionPanel/VBoxContainer/AttackOptionLabel
 @onready var heal_option_label = $CanvasLayer/ActionMenu/ActionPanel/VBoxContainer/HealOptionLabel
 @onready var wait_option_label = $CanvasLayer/ActionMenu/ActionPanel/VBoxContainer/WaitOptionLabel
-
 
 # ==================================================
 # CONSTANTS
@@ -225,6 +221,15 @@ var editor_move_start_cell: Vector2i = Vector2i(-1, -1)
 # Current save/load map slot.
 var editor_map_slot := 1
 
+# Current repository campaign level id.
+var campaign_level_ids := [
+	"01a_retreat",
+	"01b_hold",
+	"01c_vaeren"
+]
+
+var campaign_level_index := 0
+
 # Total available quick-save slots.
 const MAX_EDITOR_MAP_SLOTS = 9
 
@@ -334,7 +339,6 @@ func get_editor_map_path() -> String:
 
 	return "user://maps/map_" + str(editor_map_slot) + ".json"
 
-
 # =========================
 # Changes active editor map slot.
 # =========================
@@ -350,6 +354,45 @@ func change_editor_map_slot(direction: int):
 		editor_map_slot = 1
 
 	queue_redraw()
+
+# =========================
+# Changes active campaign
+# level browser selection.
+# =========================
+
+func change_campaign_level(direction: int):
+
+	campaign_level_index += direction
+
+	if campaign_level_index < 0:
+		campaign_level_index = campaign_level_ids.size() - 1
+
+	if campaign_level_index >= campaign_level_ids.size():
+		campaign_level_index = 0
+
+	queue_redraw()
+
+# =========================
+# Returns selected campaign
+# level id from browser list.
+# =========================
+
+func get_campaign_level_id() -> String:
+
+	return campaign_level_ids[campaign_level_index]
+
+# =========================
+# Returns current campaign
+# level repository path.
+# =========================
+
+func get_campaign_level_path() -> String:
+
+	return (
+		"res://campaign/levels/"
+		+ get_campaign_level_id()
+		+ ".json"
+	)
 
 # =========================
 # Returns true if a cell is
@@ -386,7 +429,7 @@ func save_editor_map():
 		units,
 		get_editor_map_path()
 	)
-	
+
 # =========================
 # Loads editor map.
 # =========================
@@ -398,6 +441,36 @@ func load_editor_map():
 		units,
 		unit_data,
 		get_editor_map_path()
+	)
+
+	queue_redraw()
+
+# =========================
+# Saves current map as a
+# repository campaign level.
+# =========================
+
+func save_campaign_level():
+
+	map_serializer.save_map(
+		map_data,
+		units,
+		get_campaign_level_path()
+	)
+
+
+# =========================
+# Loads current repository
+# campaign level.
+# =========================
+
+func load_campaign_level():
+
+	map_serializer.load_map(
+		map_data,
+		units,
+		unit_data,
+		get_campaign_level_path()
 	)
 
 	queue_redraw()
@@ -517,7 +590,6 @@ var pending_support_target = -1
 # Enemy providing delayed coverage reaction.
 var pending_coverage_enemies: Array[int] = []
 
-
 # ==================================================
 # CONFIRMATION STATE
 # ==================================================
@@ -525,7 +597,6 @@ var pending_coverage_enemies: Array[int] = []
 var awaiting_attack_confirmation = false
 var awaiting_support_confirmation = false
 var awaiting_wait_confirmation = false
-
 
 # ==================================================
 # GAME STATE
@@ -611,7 +682,6 @@ func draw_editor_selected_area():
 				map_data.grid_rect(cell),
 				Color(1.0, 1.0, 0.0, 0.25)
 			)
-			
 
 # =========================
 # Draws live select rectangle
@@ -682,7 +752,15 @@ func draw_editor_ui():
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(x + 140, top_y),
-		"Slot " + str(editor_map_slot) + " | Ctrl+S Save | Ctrl+L Load | [ ] Slot",
+		(
+			"Slot "
+			+ str(editor_map_slot)
+			+ " | Campaign: "
+			+ get_campaign_level_id()
+			+ " < >"
+			+ " | Ctrl+S/L Custom"
+			+ " | F9/F10 Campaign"
+		),
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
 		font_size,
@@ -691,7 +769,7 @@ func draw_editor_ui():
 
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(x + 470, top_y),
+		Vector2(x + 700, top_y),
 		"[TAB] Palette",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
@@ -701,7 +779,7 @@ func draw_editor_ui():
 
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(x + 610, top_y),
+		Vector2(x + 900, top_y),
 		"[M] Resize",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
@@ -711,7 +789,7 @@ func draw_editor_ui():
 
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(x + 760, top_y),
+		Vector2(x + 1080, top_y),
 		"[E] Exit",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
@@ -1212,8 +1290,6 @@ func _draw():
 	draw_editor_ui()
 	draw_editor_resize_ui()
 
-
-
 # =========================
 # Draws all defender leash
 # zones while debug overlay
@@ -1682,7 +1758,6 @@ func _on_action_menu_option_confirmed(option: String):
 		"Cancel":
 			_on_action_menu_cancelled()
 
-
 # =========================
 # Receives action menu
 # cancellation requests from
@@ -1756,7 +1831,6 @@ func start_battle_flow():
 
 	await show_phase_popup("Battle Commence")
 	await show_phase_popup()
-
 
 # =========================
 # Initial setup.
@@ -1917,7 +1991,6 @@ func _process(_delta):
 
 	queue_redraw()
 
-
 # ==================================================
 # INPUT HANDLING
 # ==================================================
@@ -1930,7 +2003,6 @@ func _input(event):
 
 	handle_keyboard_input(event)
 	handle_mouse_input(event)
-
 
 # ==================================================
 # KEYBOARD INPUT
@@ -1993,14 +2065,36 @@ func handle_keyboard_input(event):
 			start_editor_resize_mode()
 
 		KEY_S:
-
 			if editor_mode and event.ctrl_pressed:
 				save_editor_map()
 
 		KEY_L:
-
 			if editor_mode and event.ctrl_pressed:
 				load_editor_map()
+
+		KEY_F5:
+			if editor_mode:
+				save_editor_map()
+
+		KEY_F6:
+			if editor_mode:
+				load_editor_map()
+
+		KEY_F9:
+			if editor_mode:
+				save_campaign_level()
+
+		KEY_F10:
+			if editor_mode:
+				load_campaign_level()
+
+		KEY_COMMA:
+			if editor_mode:
+				change_campaign_level(-1)
+
+		KEY_PERIOD:
+			if editor_mode:
+				change_campaign_level(1)
 
 		KEY_TAB:
 			if editor_mode:
@@ -2100,7 +2194,6 @@ func handle_keyboard_input(event):
 				show_all_defender_leashes = !show_all_defender_leashes
 				queue_redraw()
 
-
 # =========================
 # Cycles coverage overlay display.
 # =========================
@@ -2113,7 +2206,6 @@ func cycle_coverage_mode():
 		coverage_mode = 0
 
 	queue_redraw()
-
 
 # =========================
 # Ends the current player turn.
@@ -2147,7 +2239,6 @@ func handle_wait_hotkey():
 
 	if awaiting_wait_confirmation:
 		confirm_wait()
-
 
 # =========================
 # Confirms attack action.
@@ -2209,7 +2300,6 @@ func handle_heal_hotkey():
 	if awaiting_support_confirmation:
 		confirm_support_action("heal")
 
-
 # =========================
 # Confirms regeneration spell.
 # =========================
@@ -2218,7 +2308,6 @@ func handle_regen_hotkey():
 
 	if awaiting_support_confirmation:
 		confirm_support_action("regen")
-
 
 # =========================
 # Cancels pending actions/selections.
@@ -2229,7 +2318,6 @@ func cancel_pending_action():
 	clear_pending_action_state()
 
 	queue_redraw()
-
 
 # ==================================================
 # MOUSE INPUT
@@ -2812,7 +2900,6 @@ func select_unit(unit_index: int):
 	awaiting_wait_confirmation = state["awaiting_wait_confirmation"]
 
 	queue_redraw()
-
 
 # =========================
 # Handles clicking a valid

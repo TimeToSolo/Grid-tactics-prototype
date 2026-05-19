@@ -1,0 +1,102 @@
+{
+	"height": 10.0,
+	"terrain_map": [
+		"WWWWWWWWWWWW",
+		"WWW.........",
+		"............",
+		"...RRR.....W",
+		"RRRRRR.....W",
+		"RRRRR......W",
+		"W......R...W",
+		"W.....RR...W",
+		"W.....RR...W",
+		"W...WWRRWWWW"
+	],
+	"units": [
+		{
+			"ai_profile": "cautious_ranged",
+			"class": "archer",
+			"facing_x": 0,
+			"facing_y": -1,
+			"home_facing_x": 0,
+			"home_facing_y": -1,
+			"home_x": 2,
+			"home_y": 7,
+			"leash_range": 0.0,
+			"pos_x": 2,
+			"pos_y": 7,
+			"team": "player"
+		},
+		{
+			"ai_profile": "barbarian",
+			"class": "tank",
+			"facing_x": 1,
+			"facing_y": -1,
+			"home_facing_x": 1,
+			"home_facing_y": -1,
+			"home_x": 4,
+			"home_y": 7,
+			"leash_range": 0.0,
+			"pos_x": 4,
+			"pos_y": 7,
+			"team": "player"
+		},
+		{
+			"ai_profile": "barbarian",
+			"class": "duelist",
+			"facing_x": -1,
+			"facing_y": 1,
+			"home_facing_x": -1,
+			"home_facing_y": 1,
+			"home_x": 10,
+			"home_y": 2,
+			"leash_range": 0.0,
+			"pos_x": 10,
+			"pos_y": 2,
+			"team": "enemy"
+		},
+		{
+			"ai_profile": "barbarian",
+			"class": "fighter",
+			"facing_x": -1,
+			"facing_y": 1,
+			"home_facing_x": -1,
+			"home_facing_y": 1,
+			"home_x": 8,
+			"home_y": 1,
+			"leash_range": 0.0,
+			"pos_x": 8,
+			"pos_y": 1,
+			"team": "enemy"
+		},
+		{
+			"ai_profile": "barbarian",
+			"class": "lancer",
+			"facing_x": 1,
+			"facing_y": 0,
+			"home_facing_x": 1,
+			"home_facing_y": 0,
+			"home_x": 0,
+			"home_y": 2,
+			"leash_range": 0.0,
+			"pos_x": 0,
+			"pos_y": 2,
+			"team": "enemy"
+		},
+		{
+			"ai_profile": "barbarian",
+			"class": "lancer",
+			"facing_x": 1,
+			"facing_y": -1,
+			"home_facing_x": 1,
+			"home_facing_y": -1,
+			"home_x": 4,
+			"home_y": 8,
+			"leash_range": 0.0,
+			"pos_x": 4,
+			"pos_y": 8,
+			"team": "player"
+		}
+	],
+	"width": 12.0
+}

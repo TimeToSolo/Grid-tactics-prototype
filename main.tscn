@@ -26,6 +26,7 @@
 [ext_resource type="Script" uid="uid://b48nxfwojqhsg" path="res://tactical_input_controller.gd" id="24_1u8w0"]
 [ext_resource type="Script" uid="uid://cy23qsg554ty6" path="res://hover_unit_panel_controller.gd" id="25_0odxb"]
 [ext_resource type="Script" uid="uid://cmhyvudy3ofcp" path="res://post_move_action_flow.gd" id="26_lswn8"]
+[ext_resource type="Script" uid="uid://drjpd7owufbyu" path="res://mission_flow_controller.gd" id="27_a6jrf"]
 
 [node name="Main" type="Node2D" unique_id=370152938]
 script = ExtResource("1_ig7tw")
@@ -112,6 +113,9 @@ script = ExtResource("25_0odxb")
 
 [node name="PostMoveActionFlow" type="Node" parent="Systems" unique_id=2052915096]
 script = ExtResource("26_lswn8")
+
+[node name="MissionFlowController" type="Node" parent="Systems" unique_id=597419060]
+script = ExtResource("27_a6jrf")
 
 [node name="CanvasLayer" type="Node" parent="." unique_id=1191476634]
 

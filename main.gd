@@ -58,6 +58,7 @@ extends Node2D
 @onready var editor_system = $Systems/EditorSystem
 @onready var map_serializer = $Systems/MapSerializer
 @onready var movement_system = $Systems/MovementSystem
+@onready var mission_flow_controller = $Systems/MissionFlowController
 @onready var path_preview_system = $Systems/PathPreviewSystem
 @onready var render_system = $Systems/RenderSystem
 @onready var selection_state = $Systems/SelectionState
@@ -221,15 +222,6 @@ var editor_move_start_cell: Vector2i = Vector2i(-1, -1)
 # Current save/load map slot.
 var editor_map_slot := 1
 
-# Current repository campaign level id.
-var campaign_level_ids := [
-	"01a_retreat",
-	"01b_hold",
-	"01c_vaeren"
-]
-
-var campaign_level_index := 0
-
 # Total available quick-save slots.
 const MAX_EDITOR_MAP_SLOTS = 9
 
@@ -356,45 +348,6 @@ func change_editor_map_slot(direction: int):
 	queue_redraw()
 
 # =========================
-# Changes active campaign
-# level browser selection.
-# =========================
-
-func change_campaign_level(direction: int):
-
-	campaign_level_index += direction
-
-	if campaign_level_index < 0:
-		campaign_level_index = campaign_level_ids.size() - 1
-
-	if campaign_level_index >= campaign_level_ids.size():
-		campaign_level_index = 0
-
-	queue_redraw()
-
-# =========================
-# Returns selected campaign
-# level id from browser list.
-# =========================
-
-func get_campaign_level_id() -> String:
-
-	return campaign_level_ids[campaign_level_index]
-
-# =========================
-# Returns current campaign
-# level repository path.
-# =========================
-
-func get_campaign_level_path() -> String:
-
-	return (
-		"res://campaign/levels/"
-		+ get_campaign_level_id()
-		+ ".json"
-	)
-
-# =========================
 # Returns true if a cell is
 # inside the current selected
 # editor rectangle area.
@@ -455,7 +408,7 @@ func save_campaign_level():
 	map_serializer.save_map(
 		map_data,
 		units,
-		get_campaign_level_path()
+		mission_flow_controller.get_campaign_level_path()
 	)
 
 
@@ -470,7 +423,7 @@ func load_campaign_level():
 		map_data,
 		units,
 		unit_data,
-		get_campaign_level_path()
+		mission_flow_controller.get_campaign_level_path()
 	)
 
 	queue_redraw()
@@ -756,7 +709,7 @@ func draw_editor_ui():
 			"Slot "
 			+ str(editor_map_slot)
 			+ " | Campaign: "
-			+ get_campaign_level_id()
+			+ mission_flow_controller.get_campaign_level_id()
 			+ " < >"
 			+ " | Ctrl+S/L Custom"
 			+ " | F9/F10 Campaign"
@@ -2090,11 +2043,13 @@ func handle_keyboard_input(event):
 
 		KEY_COMMA:
 			if editor_mode:
-				change_campaign_level(-1)
+				mission_flow_controller.change_campaign_level(-1)
+				queue_redraw()
 
 		KEY_PERIOD:
 			if editor_mode:
-				change_campaign_level(1)
+				mission_flow_controller.change_campaign_level(1)
+				queue_redraw()
 
 		KEY_TAB:
 			if editor_mode:

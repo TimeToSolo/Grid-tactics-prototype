@@ -579,6 +579,27 @@ var current_objective_data := {}
 var editor_objective_type := "retreat"
 var editor_required_enemy_defeats := -1
 
+var editor_objective_stage_index := 0
+
+var editor_objective_stages := [
+	{
+		"type": "defeat_enemy_count",
+		"required_count": 3,
+		"on_complete": "spawn_reinforcements"
+	},
+	{
+		"type": "retreat",
+		"zone": "player_start_area",
+		"on_complete": "victory"
+	}
+]
+
+var editor_objective_stage_types := [
+	"defeat_enemy_count",
+	"rout",
+	"retreat"
+]
+
 # True when reinforcements
 # should spawn after the
 # current enemy phase ends.
@@ -1003,15 +1024,58 @@ func draw_editor_ui():
 			Color.WHITE
 		)
 
+		var current_stage = editor_objective_stages[
+			editor_objective_stage_index
+		]
+
+		var stage_detail = ""
+
+		match current_stage.get("type", ""):
+
+			"defeat_enemy_count":
+				stage_detail = (
+					"Kills: "
+					+ str(current_stage.get("required_count", 1))
+				)
+
+			"retreat":
+				stage_detail = (
+					"Zone: "
+					+ str(current_stage.get("zone", ""))
+				)
+
+			"rout":
+				stage_detail = "Defeat all enemies"
+
 		draw_string(
 			ThemeDB.fallback_font,
 			Vector2(x + 620, facing_y),
 			(
-				"Objective: "
-				+ editor_objective_type
-				+ " | Kills: "
-				+ str(editor_required_enemy_defeats)
-				+ " [7/8]"
+				"Obj "
+				+ str(editor_objective_stage_index + 1)
+				+ "/"
+				+ str(editor_objective_stages.size())
+				+ " | Type: "
+				+ str(current_stage.get("type", ""))
+				+ " | "
+				+ stage_detail
+			),
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			font_size,
+			Color.YELLOW
+		)
+
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(x + 620, facing_y + 24),
+			(
+				"[9/0] Stage  "
+				+ "[P] Type  "
+				+ "[{/}] Value  "
+				+ "[\\] Complete: "
+				+ str(current_stage.get("on_complete", ""))
+				+ "  [O] Add  [Del] Delete"
 			),
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
@@ -1899,11 +1963,6 @@ func start_battle_flow():
 
 func load_current_campaign_mission():
 
-	var mission_data = (
-		mission_flow_controller
-		.get_current_mission_data()
-	)
-
 	mission_flow_controller.set_mission_state("battle")
 
 	current_objective_data = map_serializer.load_map(
@@ -1934,6 +1993,29 @@ func cache_player_start_area():
 		player_start_area.append(unit["pos"])
 
 # =========================
+# Returns true if current
+# objective data references
+# player start area.
+# =========================
+
+func objective_uses_player_start_area() -> bool:
+
+	if current_objective_data.get("type", "") == "retreat":
+		return true
+
+	if current_objective_data.get("type", "") != "layered":
+		return false
+
+	var stages = current_objective_data.get("stages", [])
+
+	for stage in stages:
+
+		if stage.get("zone", "") == "player_start_area":
+			return true
+
+	return false
+
+# =========================
 # Sets up objective state
 # for the current mission.
 # =========================
@@ -1949,7 +2031,7 @@ func setup_current_mission_objective():
 		current_objective_data
 	)
 
-	if current_objective_data["type"] == "retreat":
+	if objective_uses_player_start_area():
 		cache_player_start_area()
 
 # =========================
@@ -1960,14 +2042,230 @@ func setup_current_mission_objective():
 func update_current_objective_from_editor():
 
 	current_objective_data = {
-		"type": editor_objective_type
+		"type": "layered",
+		"stages": editor_objective_stages
 	}
 
-	if editor_required_enemy_defeats >= 0:
+# =========================
+# Adds a new objective stage
+# after the current stage.
+# =========================
 
-		current_objective_data[
-			"initial_enemy_defeat_count"
-		] = editor_required_enemy_defeats
+func add_editor_objective_stage():
+
+	var new_stage = get_default_objective_stage(
+		"defeat_enemy_count"
+	)
+
+	editor_objective_stages.insert(
+		editor_objective_stage_index + 1,
+		new_stage
+	)
+
+	editor_objective_stage_index += 1
+
+	queue_redraw()
+
+# =========================
+# Deletes current objective
+# stage if more than one
+# stage exists.
+# =========================
+
+func delete_editor_objective_stage():
+
+	if editor_objective_stages.size() <= 1:
+		return
+
+	editor_objective_stages.remove_at(
+		editor_objective_stage_index
+	)
+
+	editor_objective_stage_index = clamp(
+		editor_objective_stage_index,
+		0,
+		editor_objective_stages.size() - 1
+	)
+
+	queue_redraw()
+
+# =========================
+# Changes selected objective
+# stage in the editor.
+# =========================
+
+func change_editor_objective_stage(direction: int):
+
+	editor_objective_stage_index += direction
+
+	if editor_objective_stage_index < 0:
+		editor_objective_stage_index = (
+			editor_objective_stages.size() - 1
+		)
+
+	if editor_objective_stage_index >= editor_objective_stages.size():
+		editor_objective_stage_index = 0
+
+	queue_redraw()
+
+# =========================
+# Cycles selected objective
+# stage type.
+# =========================
+
+func cycle_editor_objective_stage_type():
+
+	var current_stage = editor_objective_stages[
+		editor_objective_stage_index
+	]
+
+	var current_type = current_stage.get(
+		"type",
+		"defeat_enemy_count"
+	)
+
+	var current_index = editor_objective_stage_types.find(
+		current_type
+	)
+
+	if current_index == -1:
+		current_index = 0
+
+	var next_index = (
+		current_index + 1
+	) % editor_objective_stage_types.size()
+
+	var next_type = editor_objective_stage_types[next_index]
+
+	editor_objective_stages[
+		editor_objective_stage_index
+	] = get_default_objective_stage(next_type)
+
+	queue_redraw()
+
+# =========================
+# Returns default data for
+# an objective stage type.
+# =========================
+
+func get_default_objective_stage(stage_type: String) -> Dictionary:
+
+	match stage_type:
+
+		"rout":
+			return {
+				"type": "rout",
+				"on_complete": "advance_stage"
+			}
+
+		"retreat":
+			return {
+				"type": "retreat",
+				"zone": "player_start_area",
+				"on_complete": "victory"
+			}
+
+		_:
+			return {
+				"type": "defeat_enemy_count",
+				"required_count": 1,
+				"on_complete": "advance_stage"
+			}
+
+# =========================
+# Adjusts numeric parameter
+# for selected objective stage.
+# =========================
+
+func adjust_editor_objective_stage_value(direction: int):
+
+	var current_stage = editor_objective_stages[
+		editor_objective_stage_index
+	]
+
+	match current_stage.get("type", ""):
+
+		"defeat_enemy_count":
+			current_stage["required_count"] = max(
+				1,
+				current_stage.get("required_count", 1) + direction
+			)
+
+	editor_objective_stages[
+		editor_objective_stage_index
+	] = current_stage
+
+	queue_redraw()
+
+# =========================
+# Cycles completion result
+# for selected objective stage.
+# =========================
+
+func cycle_editor_objective_completion():
+
+	var completion_options = [
+		"advance_stage",
+		"spawn_reinforcements",
+		"victory"
+	]
+
+	var current_stage = editor_objective_stages[
+		editor_objective_stage_index
+	]
+
+	var current_completion = current_stage.get(
+		"on_complete",
+		"advance_stage"
+	)
+
+	var current_index = completion_options.find(
+		current_completion
+	)
+
+	if current_index == -1:
+		current_index = 0
+
+	var next_index = (
+		current_index + 1
+	) % completion_options.size()
+
+	current_stage["on_complete"] = completion_options[next_index]
+
+	editor_objective_stages[
+		editor_objective_stage_index
+	] = current_stage
+
+	queue_redraw()
+
+# =========================
+# Resolves objective stage
+# completion events.
+#
+# Handles:
+# - reinforcement spawns
+# - victory flow
+# - stage advancement
+# =========================
+
+func resolve_objective_event(event_name: String):
+
+	match event_name:
+
+		"advance_stage":
+			return
+
+		"spawn_reinforcements":
+			pending_reinforcement_spawn = true
+			pending_reinforcement_stage = (
+				mission_objectives.get_objective_stage()
+			)
+
+		"victory":
+			await handle_mission_victory()
+
+		"defeat":
+			await handle_mission_defeat()
 
 # =========================
 # Spawns queued mission
@@ -2418,6 +2716,14 @@ func handle_keyboard_input(event):
 
 				queue_redraw()
 
+		KEY_DELETE:
+			if editor_mode:
+				delete_editor_objective_stage()
+
+		KEY_O:
+			if editor_mode:
+				add_editor_objective_stage()
+
 		KEY_1:
 			if editor_palette == "terrain":
 				selected_editor_tile = "."
@@ -2460,18 +2766,29 @@ func handle_keyboard_input(event):
 				validate_selected_editor_ai_profile()
 				queue_redraw()
 
-		KEY_7:
+		KEY_9:
 			if editor_mode:
-				editor_required_enemy_defeats = max(
-					-1,
-					editor_required_enemy_defeats - 1
-				)
-				queue_redraw()
+				change_editor_objective_stage(-1)
 
-		KEY_8:
+		KEY_0:
 			if editor_mode:
-				editor_required_enemy_defeats += 1
-				queue_redraw()
+				change_editor_objective_stage(1)
+
+		KEY_P:
+			if editor_mode:
+				cycle_editor_objective_stage_type()
+
+		KEY_BRACELEFT:
+			if editor_mode:
+				adjust_editor_objective_stage_value(-1)
+
+		KEY_BRACERIGHT:
+			if editor_mode:
+				adjust_editor_objective_stage_value(1)
+
+		KEY_BACKSLASH:
+			if editor_mode:
+				cycle_editor_objective_completion()
 
 		KEY_C:
 			cycle_coverage_mode()
@@ -3325,18 +3642,10 @@ func check_mission_end_conditions():
 		.get_mission_result(units, player_start_area)
 	)
 
-	if mission_result == "spawn_reinforcements":
-		pending_reinforcement_spawn = true
-		pending_reinforcement_stage = mission_objectives.get_objective_stage()
+	if mission_result == "":
 		return
 
-	if mission_result == "victory":
-		await handle_mission_victory()
-		return
-
-	if mission_result == "defeat":
-		await handle_mission_defeat()
-		return
+	await resolve_objective_event(mission_result)
 
 # =========================
 # Confirms pending attack.

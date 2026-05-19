@@ -53,19 +53,16 @@ func get_mission_result(
 	if not player_units_exist(units):
 		return "defeat"
 
-	match active_objective_type:
+	if active_objective_type == "layered":
+		return get_layered_objective_result(
+			units,
+			player_start_area
+		)
 
-		"retreat":
-			return get_retreat_result(
-				units,
-				player_start_area
-			)
-
-		"rout":
-			return get_rout_result(units)
+	if active_objective_type == "rout":
+		return get_rout_result(units)
 
 	return ""
-
 
 # =========================
 # Returns rout objective
@@ -79,46 +76,56 @@ func get_rout_result(units: Array) -> String:
 
 	return ""
 
-
 # =========================
-# Returns retreat objective
-# result.
-#
-# Stage 0:
-# defeat initial enemies.
-#
-# Stage 1:
-# retreat to extraction area.
+# Returns layered objective
+# result for current stage.
 # =========================
 
-func get_retreat_result(
+func get_layered_objective_result(
 	units: Array,
 	player_start_area: Array[Vector2i]
 ) -> String:
 
-	if objective_stage == 0:
+	var stages = objective_data.get("stages", [])
 
-		var required_defeats = objective_data.get(
-			"initial_enemy_defeat_count",
-			0
-		)
-
-		if enemies_defeated >= required_defeats:
-			objective_stage = 1
-			return "spawn_reinforcements"
-
+	if objective_stage >= stages.size():
 		return ""
 
-	if objective_stage == 1:
+	var stage = stages[objective_stage]
 
-		if all_player_units_in_area(
-			units,
-			player_start_area
-		):
-			return "victory"
+	match stage.get("type", ""):
+
+		"defeat_enemy_count":
+
+			var required_count = stage.get(
+				"required_count",
+				0
+			)
+
+			if enemies_defeated >= required_count:
+
+				objective_stage += 1
+
+				return stage.get(
+					"on_complete",
+					""
+				)
+
+		"retreat":
+
+			if all_player_units_in_area(
+				units,
+				player_start_area
+			):
+
+				objective_stage += 1
+
+				return stage.get(
+					"on_complete",
+					""
+				)
 
 	return ""
-
 
 # =========================
 # Returns true if any player

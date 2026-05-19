@@ -1,5 +1,20 @@
 {
 	"height": 10.0,
+	"objective": {
+		"stages": [
+			{
+				"on_complete": "spawn_reinforcements",
+				"required_count": 3,
+				"type": "defeat_enemy_count"
+			},
+			{
+				"on_complete": "victory",
+				"type": "retreat",
+				"zone": "player_start_area"
+			}
+		],
+		"type": "layered"
+	},
 	"terrain_map": [
 		"WWWWWWWWWWWW",
 		"WWW.........",
@@ -106,7 +121,7 @@
 			"home_facing_y": 0,
 			"home_x": 1,
 			"home_y": 2,
-			"leash_range": 0,
+			"leash_range": 0.0,
 			"pos_x": 1,
 			"pos_y": 2,
 			"reinforcement_stage": 1,
@@ -122,7 +137,7 @@
 			"home_facing_y": 0,
 			"home_x": 1,
 			"home_y": 3,
-			"leash_range": 0,
+			"leash_range": 0.0,
 			"pos_x": 1,
 			"pos_y": 3,
 			"reinforcement_stage": 1,
@@ -138,7 +153,7 @@
 			"home_facing_y": 0,
 			"home_x": 11,
 			"home_y": 2,
-			"leash_range": 0,
+			"leash_range": 0.0,
 			"pos_x": 11,
 			"pos_y": 2,
 			"reinforcement_stage": 1,
@@ -154,7 +169,7 @@
 			"home_facing_y": 0,
 			"home_x": 11,
 			"home_y": 1,
-			"leash_range": 0,
+			"leash_range": 0.0,
 			"pos_x": 11,
 			"pos_y": 1,
 			"reinforcement_stage": 1,

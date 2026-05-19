@@ -2,7 +2,7 @@
 
 Turn-based tactical combat prototype built in Godot using GDScript.
 
-This project explores tactical combat centered around movement, facing, stamina, directional coverage, territorial control, battlefield pressure, terrain-aware navigation, formation-based engagements, readable AI behavior, and sequential battlefield presentation.
+This project explores tactical combat centered around movement, facing, stamina, directional coverage, territorial control, battlefield pressure, terrain-aware navigation, formation-based engagements, readable AI behavior, sequential battlefield presentation, and data-driven mission scripting.
 
 The goal is to create battles where:
 - positioning matters before attacks happen
@@ -12,6 +12,7 @@ The goal is to create battles where:
 - chokepoints and navigation matter tactically
 - AI behaves consistently within terrain constraints
 - enemy actions remain readable and visually understandable
+- missions evolve dynamically through staged objectives and reinforcements
 
 Rather than focusing on raw stat trading, the prototype emphasizes:
 - formation integrity
@@ -23,6 +24,7 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - terrain-aware tactical positioning
 - navigable battlefield control
 - sequential combat readability
+- dynamic mission flow
 
 ---
 
@@ -66,6 +68,8 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Chokepoint-aware movement behavior
 - Animated sequential AI movement
 - Tile-by-tile enemy movement presentation
+- Reinforcement slide-in movement presentation
+- Hidden facing during movement animations
 - Future-path directional facing
 - AI facing based on continued navigable routes
 
@@ -100,6 +104,11 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Stamina-driven battlefield pacing
 - Direction-aware enemy presentation
 - Sequential battlefield readability systems
+- Data-driven layered mission objectives
+- Multi-stage mission flow
+- Dynamic reinforcement spawning
+- Objective-event resolution system
+- Campaign mission architecture
 
 ## AI Systems
 
@@ -162,16 +171,37 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Avoids unnecessary frontline exposure
 - Falls back to movement behavior when no healing target exists
 
+## Campaign and Mission Systems
+
+- Campaign mission browser
+- Mission flow controller
+- Repository-based campaign map loading
+- Mission state architecture
+- Data-driven objective definitions
+- Layered mission objective stages
+- Objective stage progression
+- Dynamic objective transitions
+- Reinforcement-stage spawning
+- Event-driven mission progression
+- Campaign victory/defeat flow
+- Modular mission-result evaluation
+- Serialized mission objective data
+- Mission scripting foundation
+
 ## Editor Features
 
 - Terrain painting
 - Rectangle fill tool
 - Unit placement/removal
 - Save/load map slots
+- Campaign-level save/load workflow
 - Rectangle terrain/unit movement
 - Team assignment
 - Facing assignment
 - AI profile assignment
+- Reinforcement placement mode
+- Reinforcement stage assignment
+- Reinforcement visualization overlays
 - Editor UI overlays
 - Unit selection mode
 - Defender leash editing
@@ -181,6 +211,14 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Live leash-range previews
 - Global defender territory debug overlay (`F7`)
 - Persistent defender home/leash serialization
+- Objective-stage editor
+- Layered objective authoring
+- Objective stage add/remove tools
+- Objective stage navigation
+- Objective type editing
+- Objective parameter editing
+- Objective completion-event editing
+- Persistent objective serialization
 - Rapid tutorial-map prototyping workflow
 
 ## UI Features
@@ -213,15 +251,16 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Attack lunge animations
 - Delayed HP update presentation
 - Enemy action pacing pauses
-- Hidden facing during movement animations
 - Future-path AI facing presentation
+- Reinforcement spawn presentation
+- Objective editor UI
+- Mission-stage inspection UI
 
 ---
 
 # Design Goals
 
 This prototype is focused on creating tactical battles where:
-
 - movement creates vulnerability
 - terrain shapes tactical decisions
 - defensive lines matter
@@ -236,7 +275,8 @@ This prototype is focused on creating tactical battles where:
 - navigable routes matter more than geometric proximity
 - chokepoints create meaningful tactical pressure
 - enemy actions remain visually understandable
-- battlefield flow can be read at a glance
+- mission objectives evolve dynamically during battle
+- tactical encounters support cinematic campaign flow
 
 The combat system draws inspiration from tactical RPGs and strategy games, but replaces unlimited counterattacks with stamina-limited directional coverage and reaction systems.
 
@@ -248,79 +288,6 @@ The long-term goal is to create battles that feel:
 - tactically expressive
 - formation-focused
 - visually understandable
+- campaign-driven
 
 rather than purely statistical.
-
----
-
-# Planned Features
-
-## AI Expansion
-
-- Disciplined AI
-- Formation AI
-- Patrol AI
-- Escort AI
-- Advanced ranged positioning AI
-- Support/healer AI
-- Objective-defense AI
-- Multi-layer territory ownership
-- Reinforcement behaviors
-- AI coordination systems
-- Safe-path evaluation
-- Terrain-preference AI
-- Coverage-avoidance logic
-- Formation cohesion behavior
-- AI fallback line behavior
-
-## Tactical Systems
-
-- Additional terrain types
-- Cavalry and breakthrough mechanics
-- Morale/pressure systems
-- Shieldwall or formation bonuses
-- Unit traits and faction specialties
-- Objective-based combat
-- Ambush and stealth systems
-- Patrol routes
-- Dynamic defensive lines
-- Engineer/barricade systems
-- Destructible battlefield fortifications
-- Temporary deployable terrain
-- Expanded battlefield readability systems
-- Sprite-based combat presentation
-
----
-
-# Current Status
-
-Early prototype / active development.
-
-Systems, balance, AI behavior, editor tooling, map design, tactical pacing, and presentation systems are experimental and subject to change as the tactical framework evolves.
-
-Recent development has focused heavily on:
-- terrain-aware pathfinding
-- modular AI architecture
-- territory-aware defender behavior
-- tactical readability
-- hover/inspection UI systems
-- editor workflow improvements
-- scalable tactical systems
-- debugging and visualization tools
-- ranged/support AI behaviors
-- AI terrain-aware targeting
-- movement/path refactoring
-- modular action/support systems
-- coverage path traversal logic
-- tutorial encounter design
-- codebase cleanup and system normalization
-- sequential AI movement presentation
-- attack timing synchronization
-- future-path AI facing
-- AI/presentation layer separation
-- battlefield readability improvements
-- keyboard tactical controls
-- nested action-menu flow
-- contextual confirmation UI
-- hover-preview combat visualization
-- enemy-turn input locking

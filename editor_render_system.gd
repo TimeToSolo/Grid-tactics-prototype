@@ -9,6 +9,10 @@ extends Node
 # - drag previews
 # - editor visual helpers
 #
+# All rendering functions receive
+# the parent drawing canvas so this
+# node remains stateless and reusable.
+#
 # Main.gd still owns:
 # - _draw()
 # - render order
@@ -123,7 +127,12 @@ func draw_editor_select_drag_preview(
 			)
 
 # =========================
-# Draws selected editor area.
+# Draws the currently
+# selected rectangle area
+# in select mode.
+#
+# Yellow overlay =
+# active selected region.
 # =========================
 
 func draw_editor_selected_area(
@@ -178,8 +187,12 @@ func draw_editor_selected_area(
 			)
 
 # =========================
-# Draws destination preview
-# while moving selected area.
+# Draws movement preview
+# for a selected rectangle
+# area while dragging.
+#
+# Cyan overlay =
+# destination preview.
 # =========================
 
 func draw_editor_move_preview(
@@ -227,16 +240,19 @@ func draw_editor_move_preview(
 			)
 
 # =========================
-# Draws destination preview
+# Draws movement preview
 # while dragging a selected
 # editor unit.
+#
+# Yellow overlay =
+# predicted destination.
 # =========================
 
 func draw_editor_unit_move_preview(
 	canvas,
 	map_data,
 	editor_state,
-	units,
+	units: Array,
 	hovered_cell: Vector2i
 ):
 
@@ -277,15 +293,22 @@ func draw_editor_unit_move_preview(
 	)
 
 # =========================
-# Draws reinforcement markers
-# on staged editor units.
+# Draws reinforcement stage
+# markers for hidden enemy
+# units in editor mode.
+#
+# Purple border =
+# reinforcement unit.
+#
+# Label format:
+# R# = spawn stage.
 # =========================
 
 func draw_editor_reinforcement_markers(
 	canvas,
 	map_data,
 	editor_state,
-	units
+	units: Array
 ):
 
 	if not editor_state.editor_mode:
@@ -297,6 +320,15 @@ func draw_editor_reinforcement_markers(
 			continue
 
 		if not unit["starts_hidden"]:
+			continue
+
+		if not unit.has("reinforcement_stage"):
+			continue
+
+		if not unit.has("pos"):
+			continue
+
+		if not unit["pos"] is Vector2i:
 			continue
 
 		var marker_pos = (
@@ -324,6 +356,9 @@ func draw_editor_reinforcement_markers(
 # =========================
 # Draws objective zone tiles
 # while editing maps.
+#
+# Cyan overlay =
+# objective zone area.
 # =========================
 
 func draw_editor_objective_zones(
@@ -337,7 +372,13 @@ func draw_editor_objective_zones(
 
 	for zone_name in editor_state.objective_zones.keys():
 
+		if not editor_state.objective_zones[zone_name] is Array:
+			continue
+
 		for cell in editor_state.objective_zones[zone_name]:
+
+			if not cell is Vector2i:
+				continue
 
 			if not map_data.is_inside_grid(cell):
 				continue
@@ -355,15 +396,30 @@ func draw_editor_objective_zones(
 			)
 
 # =========================
-# Draws editor mode controls
-# and highlights selected option.
+# Draws the main editor UI.
+#
+# Includes:
+# - palette selection
+# - terrain/unit options
+# - objective editing controls
+# - reinforcement settings
+# - selected unit info
+# - editor hotkey hints
+#
+# This function only handles
+# editor UI rendering.
+#
+# It does NOT:
+# - process input
+# - modify editor state
+# - perform editor actions
 # =========================
 
 func draw_editor_ui(
 	canvas,
 	editor_state,
 	mission_flow_controller,
-	units
+	units: Array
 ):
 
 	if not editor_state.editor_mode:
@@ -678,6 +734,15 @@ func draw_editor_ui(
 			Color.WHITE
 		)
 
+		if editor_state.editor_objective_stages.is_empty():
+			return
+
+		if editor_state.editor_objective_stage_index < 0:
+			return
+
+		if editor_state.editor_objective_stage_index >= editor_state.editor_objective_stages.size():
+			return
+
 		var current_stage = editor_state.editor_objective_stages[
 			editor_state.editor_objective_stage_index
 		]
@@ -736,3 +801,190 @@ func draw_editor_ui(
 			font_size,
 			Color.YELLOW
 		)
+
+# =========================
+# Draws the editor map
+# resize popup UI while
+# resize mode is active.
+#
+# Displays:
+# - current width
+# - current height
+# - resize controls
+# =========================
+
+func draw_editor_resize_ui(
+	canvas,
+	editor_state
+):
+
+	if not editor_state.editor_resize_mode:
+		return
+
+	canvas.draw_rect(
+		Rect2(12, 120, 360, 130),
+		Color(0.0, 0.0, 0.0, 0.75)
+	)
+
+	canvas.draw_string(
+		ThemeDB.fallback_font,
+		Vector2(24, 150),
+		"MAP SIZE",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		18,
+		Color.WHITE
+	)
+
+	canvas.draw_string(
+		ThemeDB.fallback_font,
+		Vector2(24, 180),
+		"Width: " + str(editor_state.editor_resize_width) + "   Left/Right",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		16,
+		Color.WHITE
+	)
+
+	canvas.draw_string(
+		ThemeDB.fallback_font,
+		Vector2(24, 205),
+		"Height: " + str(editor_state.editor_resize_height) + "   Up/Down",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		16,
+		Color.WHITE
+	)
+
+	canvas.draw_string(
+		ThemeDB.fallback_font,
+		Vector2(24, 235),
+		"Enter: confirm   Esc: cancel",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		16,
+		Color.YELLOW
+	)
+
+# =========================
+# Draws all defender leash
+# zones while debug overlay
+# is enabled.
+#
+# Used for editor debugging.
+#
+# Purple overlay = defender
+# territory area.
+# =========================
+
+func draw_all_defender_leashes(
+	canvas,
+	map_data,
+	editor_state,
+	units: Array
+):
+
+	if not editor_state.editor_mode:
+		return
+
+	if not editor_state.show_all_defender_leashes:
+		return
+
+	for unit in units:
+
+		if not unit.has("ai_profile"):
+			continue
+
+		if unit["ai_profile"] != "defender":
+			continue
+
+		if not unit.has("home_pos"):
+			continue
+
+		if not unit.has("leash_range"):
+			continue
+
+		var occupied_tiles: Array[Vector2i] = []
+
+		var leash_tiles = map_data.get_move_range(
+			unit["home_pos"],
+			unit["leash_range"],
+			occupied_tiles
+		)
+
+		for tile in leash_tiles:
+
+			if not map_data.is_inside_grid(tile):
+				continue
+
+			canvas.draw_rect(
+				map_data.grid_rect(tile),
+				Color(0.6, 0.2, 1.0, 0.12)
+			)
+
+		canvas.draw_rect(
+			map_data.grid_rect(unit["home_pos"]),
+			Color(0.6, 0.2, 1.0, 0.35)
+		)
+
+# =========================
+# Draws leash range preview
+# for the currently selected
+# editor unit.
+#
+# Blue overlay = allowed
+# defender movement area.
+# =========================
+
+func draw_selected_editor_unit_leash(
+	canvas,
+	map_data,
+	editor_state,
+	units: Array
+):
+
+	if not editor_state.editor_mode:
+		return
+
+	if editor_state.editor_palette != "select":
+		return
+
+	if editor_state.selected_editor_unit == -1:
+		return
+
+	if editor_state.selected_editor_unit >= units.size():
+		return
+
+	var unit = units[editor_state.selected_editor_unit]
+
+	if not unit.has("home_pos"):
+		return
+
+	if not unit.has("leash_range"):
+		return
+
+	if not unit["home_pos"] is Vector2i:
+		return
+
+	var occupied_tiles: Array[Vector2i] = []
+
+	var leash_tiles = map_data.get_move_range(
+		unit["home_pos"],
+		unit["leash_range"],
+		occupied_tiles
+	)
+
+	for tile in leash_tiles:
+
+		if not map_data.is_inside_grid(tile):
+			continue
+
+		canvas.draw_rect(
+			map_data.grid_rect(tile),
+			Color(0.2, 0.5, 1.0, 0.22)
+		)
+
+	canvas.draw_rect(
+		map_data.grid_rect(unit["home_pos"]),
+		Color(0.0, 0.8, 1.0, 0.45)
+	)

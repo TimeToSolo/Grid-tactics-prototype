@@ -30,6 +30,8 @@
 [ext_resource type="Script" uid="uid://cf7tohx3ldgrx" path="res://mission_objectives.gd" id="28_xuqvo"]
 [ext_resource type="Script" uid="uid://kgmlgco8jet2" path="res://editor_render_system.gd" id="29_kq58d"]
 [ext_resource type="Script" uid="uid://dcxna3xljgcx5" path="res://editor_state.gd" id="29_qsp4k"]
+[ext_resource type="Script" uid="uid://c44at631la0dp" path="res://editor_input_controller.gd" id="31_seu75"]
+[ext_resource type="Script" uid="uid://dbv2rnyd8nto2" path="res://editor_objective_serializer.gd" id="32_htxhm"]
 
 [node name="Main" type="Node2D" unique_id=370152938]
 script = ExtResource("1_ig7tw")
@@ -132,6 +134,12 @@ script = ExtResource("29_kq58d")
 
 [node name="EditorState" type="Node" parent="Systems" unique_id=1845678435]
 script = ExtResource("29_qsp4k")
+
+[node name="EditorInputController" type="Node" parent="Systems" unique_id=1588121619]
+script = ExtResource("31_seu75")
+
+[node name="EditorObjectiveSerializer" type="Node" parent="Systems" unique_id=1142485438]
+script = ExtResource("32_htxhm")
 
 [node name="CanvasLayer" type="Node" parent="." unique_id=1191476634]
 

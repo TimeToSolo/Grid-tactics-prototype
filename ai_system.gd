@@ -8,68 +8,25 @@ extends Node
 # Handles automated turns for non-player teams.
 #
 # Current supported AI profiles:
-# - barbarian:
-#   - charges nearest enemy
-#   - attacks if possible
-#   - ignores coverage danger
+# - barbarian
+# - cautious_ranged
+# - defender
+# - support_healer
 #
 # Future profiles:
-# - chokepoint_holder
 # - disciplined
-# - cautious_ranged
-# - support
 # - objective_guard
+# - flanker
+# - formation_holder
 # ==================================================
 
+# ==================================================
+# SHARED AI CONSTANTS
+# ==================================================
 
-func take_team_turn(
-	units: Array,
-	team: String,
-	map_data,
-	unit_logic,
-	movement_system,
-	action_system,
-	combat_logic,
-	coverage_system,
-	stamina_system
-) -> Array:
-
-	var action_results: Array = []
-	var unit_ids: Array[int] = []
-
-	for unit in units:
-		if unit["team"] == team and not unit["has_acted"]:
-			unit_ids.append(unit["id"])
-
-	for unit_id in unit_ids:
-
-		var unit_index = unit_query.get_unit_index_by_id(
-			units,
-			unit_id
-		)
-
-		if unit_index == -1:
-			continue
-
-		if units[unit_index]["has_acted"]:
-			continue
-
-		var action_result = take_unit_turn(
-			units,
-			unit_index,
-			map_data,
-			unit_logic,
-			movement_system,
-			action_system,
-			combat_logic,
-			coverage_system,
-			stamina_system
-		)
-
-		if action_result != null:
-			action_results.append(action_result)
-
-	return action_results
+const INVALID_UNIT := -1
+const INVALID_CELL := Vector2i(-1, -1)
+const NO_DISTANCE := 999999
 
 # =========================
 # Processes one AI unit's turn
@@ -78,6 +35,9 @@ func take_team_turn(
 #
 # Team controls allegiance.
 # AI profile controls behavior.
+#
+# Unknown profiles fall back
+# to barbarian behavior.
 # =========================
 
 func take_unit_turn(
@@ -91,6 +51,22 @@ func take_unit_turn(
 	coverage_system,
 	stamina_system
 ):
+
+	if unit_index == INVALID_UNIT:
+		return {
+			"moved": false,
+			"path_cells": [],
+			"unit_died": false,
+			"attacked": false
+		}
+
+	if unit_index >= units.size():
+		return {
+			"moved": false,
+			"path_cells": [],
+			"unit_died": false,
+			"attacked": false
+		}
 
 	var ai_profile = "barbarian"
 
@@ -225,7 +201,8 @@ func get_archer_desired_retreat_distance(
 	return 2
 
 # =========================
-# Returns attack tiles for AI evaluation.
+# Returns valid attack tiles
+# for AI evaluation.
 #
 # Healers use adjacent attacks.
 # Other classes use normal attack ranges.
@@ -267,10 +244,10 @@ func can_attack_target_from_cell(
 	unit_logic
 ) -> bool:
 
-	if attacker_index == -1:
+	if attacker_index == INVALID_UNIT:
 		return false
 
-	if target_index == -1:
+	if target_index == INVALID_UNIT:
 		return false
 
 	if attacker_index >= units.size():
@@ -312,14 +289,14 @@ func move_ai_unit(
 	stamina_system
 ) -> Dictionary:
 
-	if unit_index == -1:
+	if unit_index >= units.size():
 		return {
 			"died": false,
 			"path_cells": [],
 			"moved": false
 		}
 
-	if unit_index >= units.size():
+	if destination == INVALID_CELL:
 		return {
 			"died": false,
 			"path_cells": [],
@@ -412,6 +389,12 @@ func get_best_archer_retreat_tile(
 	unit_logic
 ) -> Vector2i:
 
+	if archer_index == INVALID_UNIT or target_index == INVALID_UNIT:
+		return INVALID_CELL
+
+	if archer_index >= units.size() or target_index >= units.size():
+		return INVALID_CELL
+
 	var archer = units[archer_index]
 	var target = units[target_index]
 
@@ -465,17 +448,16 @@ func get_best_archer_retreat_tile(
 		return test_tile
 
 	return archer["pos"]
-	
+
 # =========================
-# Processes one cautious ranged AI turn.
+# Processes one cautious
+# ranged AI turn.
 #
-# Cautious ranged behavior:
-# - targets the nearest enemy
-# - approaches until it can shoot
-# - if already able to shoot, retreats slightly
-# - retreats as much as possible while
-#   preserving lethal damage
-# - shoots after repositioning if possible
+# Behavior:
+# - attacks if already in range
+# - retreats while preserving shots
+# - approaches cautiously otherwise
+# - prefers minimal movement needed
 # =========================
 
 func process_cautious_ranged_turn(
@@ -490,13 +472,29 @@ func process_cautious_ranged_turn(
 	stamina_system
 ):
 
+	if unit_index == INVALID_UNIT:
+		return {
+			"moved": false,
+			"path_cells": [],
+			"unit_died": false,
+			"attacked": false
+		}
+
+	if unit_index >= units.size():
+		return {
+			"moved": false,
+			"path_cells": [],
+			"unit_died": false,
+			"attacked": false
+		}
+
 	var target_index = get_nearest_enemy(
 		units,
 		unit_index,
 		map_data
 	)
 
-	if target_index == -1:
+	if target_index == INVALID_UNIT:
 		units[unit_index]["has_acted"] = true
 
 		return {
@@ -544,6 +542,16 @@ func process_cautious_ranged_turn(
 			unit_logic
 		)
 
+	if destination == INVALID_CELL:
+		units[unit_index]["has_acted"] = true
+
+		return {
+			"moved": false,
+			"path_cells": [],
+			"unit_died": false,
+			"attacked": false
+		}
+
 	var move_result = move_ai_unit(
 		units,
 		unit_index,
@@ -571,7 +579,7 @@ func process_cautious_ranged_turn(
 		map_data
 	)
 
-	if target_index != -1:
+	if target_index != INVALID_UNIT:
 
 		var attack_result = try_attack_target(
 			units,
@@ -628,6 +636,12 @@ func get_best_archer_approach_tile(
 	unit_logic
 ) -> Vector2i:
 
+	if archer_index == INVALID_UNIT or target_index == INVALID_UNIT:
+		return INVALID_CELL
+
+	if archer_index >= units.size() or target_index >= units.size():
+		return INVALID_CELL
+
 	var archer = units[archer_index]
 
 	var move_tiles = map_data.get_move_range(
@@ -640,7 +654,7 @@ func get_best_archer_approach_tile(
 	)
 
 	var best_tile = archer["pos"]
-	var best_move_distance = 999999
+	var best_move_distance = NO_DISTANCE
 	var found_attack_tile = false
 
 	for tile in move_tiles:
@@ -705,7 +719,7 @@ func get_future_path_facing(
 	map_data
 ) -> Vector2i:
 
-	if unit_index == -1 or target_index == -1:
+	if unit_index == INVALID_UNIT or target_index == INVALID_UNIT:
 		return Vector2i.ZERO
 
 	if unit_index >= units.size() or target_index >= units.size():
@@ -767,13 +781,30 @@ func process_barbarian_turn(
 	stamina_system
 ):
 
+	if unit_index == INVALID_UNIT:
+		return {
+			"moved": false,
+			"path_cells": [],
+			"unit_died": false,
+			"attacked": false
+		}
+
+	if unit_index >= units.size():
+		return {
+			"moved": false,
+			"path_cells": [],
+			"unit_died": false,
+			"attacked": false
+		}
+
 	var target_index = get_nearest_enemy(
 		units,
 		unit_index,
 		map_data
 	)
 
-	if target_index == -1:
+	if target_index == INVALID_UNIT:
+
 		units[unit_index]["has_acted"] = true
 
 		return {
@@ -812,6 +843,17 @@ func process_barbarian_turn(
 		map_data
 	)
 
+	if destination == INVALID_CELL:
+
+		units[unit_index]["has_acted"] = true
+
+		return {
+			"moved": false,
+			"path_cells": [],
+			"unit_died": false,
+			"attacked": false
+		}
+
 	var move_result = move_ai_unit(
 		units,
 		unit_index,
@@ -824,6 +866,7 @@ func process_barbarian_turn(
 	)
 
 	if move_result["died"]:
+
 		units.remove_at(unit_index)
 
 		return {
@@ -839,7 +882,7 @@ func process_barbarian_turn(
 		map_data
 	)
 
-	if target_index != -1:
+	if target_index != INVALID_UNIT:
 
 		attack_result = try_attack_target(
 			units,
@@ -892,10 +935,11 @@ func process_barbarian_turn(
 # Attempts to attack a target unit.
 #
 # Returns action result data:
-# - attacked: true if attack occurred
+# - attacked
 # - attacker_index
 # - target_index
 # - target_died
+# - damage
 # =========================
 
 func try_attack_target(
@@ -908,20 +952,22 @@ func try_attack_target(
 	stamina_system
 ) -> Dictionary:
 
-	if attacker_index == -1:
+	if attacker_index == INVALID_UNIT:
 		return {
 			"attacked": false,
 			"attacker_index": attacker_index,
 			"target_index": target_index,
-			"target_died": false
+			"target_died": false,
+			"damage": 0
 		}
 
-	if target_index == -1:
+	if target_index == INVALID_UNIT:
 		return {
 			"attacked": false,
 			"attacker_index": attacker_index,
 			"target_index": target_index,
-			"target_died": false
+			"target_died": false,
+			"damage": 0
 		}
 
 	if attacker_index >= units.size():
@@ -929,7 +975,8 @@ func try_attack_target(
 			"attacked": false,
 			"attacker_index": attacker_index,
 			"target_index": target_index,
-			"target_died": false
+			"target_died": false,
+			"damage": 0
 		}
 
 	if target_index >= units.size():
@@ -937,7 +984,8 @@ func try_attack_target(
 			"attacked": false,
 			"attacker_index": attacker_index,
 			"target_index": target_index,
-			"target_died": false
+			"target_died": false,
+			"damage": 0
 		}
 
 	var attacker = units[attacker_index]
@@ -955,7 +1003,8 @@ func try_attack_target(
 			"attacked": false,
 			"attacker_index": attacker_index,
 			"target_index": target_index,
-			"target_died": false
+			"target_died": false,
+			"damage": 0
 		}
 
 	var attack_direction = target["pos"] - attacker["pos"]
@@ -1004,7 +1053,7 @@ func try_attack_target(
 #
 # Returns:
 # - enemy unit index
-# - or -1 if no reachable enemies exist
+# - INVALID_UNIT if no reachable enemies exist
 # =========================
 
 func get_nearest_enemy(
@@ -1013,8 +1062,14 @@ func get_nearest_enemy(
 	map_data
 ) -> int:
 
-	var best_index = -1
-	var best_distance = 999999
+	if unit_index == INVALID_UNIT:
+		return INVALID_UNIT
+
+	if unit_index >= units.size():
+		return INVALID_UNIT
+
+	var best_index = INVALID_UNIT
+	var best_distance = NO_DISTANCE
 
 	var unit_team = units[unit_index]["team"]
 	var unit_pos = units[unit_index]["pos"]
@@ -1065,7 +1120,7 @@ func get_nearest_enemy(
 #
 # Returns:
 # - enemy unit index
-# - or -1 if no valid enemy exists
+# - INVALID_UNIT if no valid enemy exists
 # =========================
 
 func get_nearest_enemy_inside_defender_leash(
@@ -1074,10 +1129,16 @@ func get_nearest_enemy_inside_defender_leash(
 	map_data
 ) -> int:
 
+	if unit_index == INVALID_UNIT:
+		return INVALID_UNIT
+
+	if unit_index >= units.size():
+		return INVALID_UNIT
+
 	var unit = units[unit_index]
 
-	var best_index = -1
-	var best_distance = 999999
+	var best_index = INVALID_UNIT
+	var best_distance = NO_DISTANCE
 
 	for i in range(units.size()):
 
@@ -1128,6 +1189,12 @@ func get_best_move_toward_target(
 	map_data
 ) -> Vector2i:
 
+	if unit_index == INVALID_UNIT or target_index == INVALID_UNIT:
+		return INVALID_CELL
+
+	if unit_index >= units.size() or target_index >= units.size():
+		return INVALID_CELL
+
 	var unit = units[unit_index]
 	var target = units[target_index]
 
@@ -1141,8 +1208,8 @@ func get_best_move_toward_target(
 	)
 
 	var best_tile = unit["pos"]
-	var best_distance = 999999
-	var best_move_cost = 999999
+	var best_distance = NO_DISTANCE
+	var best_move_cost = NO_DISTANCE
 
 	var planning_occupied_tiles = unit_query.get_enemy_occupied_tiles(
 		units,
@@ -1221,6 +1288,22 @@ func process_defender_turn(
 	stamina_system
 ):
 
+	if unit_index == INVALID_UNIT:
+		return {
+			"moved": false,
+			"path_cells": [],
+			"unit_died": false,
+			"attacked": false
+		}
+
+	if unit_index >= units.size():
+		return {
+			"moved": false,
+			"path_cells": [],
+			"unit_died": false,
+			"attacked": false
+		}
+
 	ensure_defender_home_data(
 		units,
 		unit_index
@@ -1232,7 +1315,7 @@ func process_defender_turn(
 		map_data
 	)
 
-	if target_index == -1:
+	if target_index == INVALID_UNIT:
 
 		if units[unit_index]["pos"] != units[unit_index]["home_pos"]:
 
@@ -1316,6 +1399,16 @@ func process_defender_turn(
 		unit_logic
 	)
 
+	if destination == INVALID_CELL:
+		units[unit_index]["has_acted"] = true
+
+		return {
+			"moved": false,
+			"path_cells": [],
+			"unit_died": false,
+			"attacked": false
+		}
+
 	var combat_move_result = move_ai_unit(
 		units,
 		unit_index,
@@ -1343,7 +1436,7 @@ func process_defender_turn(
 		map_data
 	)
 
-	if target_index != -1:
+	if target_index != INVALID_UNIT:
 
 		attack_result = try_attack_target(
 			units,
@@ -1399,6 +1492,12 @@ func get_best_return_home_tile(
 	map_data
 ) -> Vector2i:
 
+	if unit_index == INVALID_UNIT:
+		return INVALID_CELL
+
+	if unit_index >= units.size():
+		return INVALID_CELL
+
 	var unit = units[unit_index]
 
 	var occupied_tiles = unit_query.get_all_occupied_tiles_except_unit(
@@ -1447,6 +1546,12 @@ func ensure_defender_home_data(
 	units: Array,
 	unit_index: int
 ):
+
+	if unit_index == INVALID_UNIT:
+		return
+
+	if unit_index >= units.size():
+		return
 
 	if not units[unit_index].has("home_pos"):
 		units[unit_index]["home_pos"] = units[unit_index]["pos"]
@@ -1499,6 +1604,12 @@ func get_best_defender_tile(
 	unit_logic
 ) -> Vector2i:
 
+	if unit_index == INVALID_UNIT or target_index == INVALID_UNIT:
+		return INVALID_CELL
+
+	if unit_index >= units.size() or target_index >= units.size():
+		return INVALID_CELL
+
 	var unit = units[unit_index]
 	var target = units[target_index]
 
@@ -1512,7 +1623,7 @@ func get_best_defender_tile(
 	)
 
 	var best_tile = unit["pos"]
-	var best_score = 999999
+	var best_score = NO_DISTANCE
 
 	for tile in move_tiles:
 
@@ -1577,13 +1688,29 @@ func process_support_healer_turn(
 	stamina_system
 ):
 
+	if unit_index == INVALID_UNIT:
+		return {
+			"moved": false,
+			"path_cells": [],
+			"unit_died": false,
+			"attacked": false
+		}
+
+	if unit_index >= units.size():
+		return {
+			"moved": false,
+			"path_cells": [],
+			"unit_died": false,
+			"attacked": false
+		}
+
 	var heal_target_index = get_best_heal_target(
 		units,
 		unit_index,
 		map_data
 	)
 
-	if heal_target_index != -1:
+	if heal_target_index != INVALID_UNIT:
 
 		if try_heal_target(
 			units,
@@ -1608,6 +1735,16 @@ func process_support_healer_turn(
 			map_data,
 			unit_logic
 		)
+
+		if destination == INVALID_CELL:
+			units[unit_index]["has_acted"] = true
+
+			return {
+				"moved": false,
+				"path_cells": [],
+				"unit_died": false,
+				"attacked": false
+			}
 
 		var move_result = move_ai_unit(
 			units,
@@ -1636,7 +1773,7 @@ func process_support_healer_turn(
 			map_data
 		)
 
-		if heal_target_index != -1:
+		if heal_target_index != INVALID_UNIT:
 
 			if try_heal_target(
 				units,
@@ -1669,7 +1806,7 @@ func process_support_healer_turn(
 		map_data
 	)
 
-	if enemy_index != -1:
+	if enemy_index != INVALID_UNIT:
 
 		var attack_result = try_attack_target(
 			units,
@@ -1718,14 +1855,20 @@ func get_best_heal_target(
 	map_data
 ) -> int:
 
+	if healer_index == INVALID_UNIT:
+		return INVALID_UNIT
+
+	if healer_index >= units.size():
+		return INVALID_UNIT
+
 	var healer = units[healer_index]
 
 	if healer.has("heal_charges"):
 		if healer["heal_charges"] <= 0:
-			return -1
+			return INVALID_UNIT
 
-	var best_index = -1
-	var best_score = 999999
+	var best_index = INVALID_UNIT
+	var best_score = NO_DISTANCE
 
 	for i in range(units.size()):
 
@@ -1782,10 +1925,10 @@ func try_heal_target(
 	stamina_system
 ) -> bool:
 
-	if healer_index == -1:
+	if healer_index == INVALID_UNIT:
 		return false
 
-	if target_index == -1:
+	if target_index == INVALID_UNIT:
 		return false
 
 	if healer_index >= units.size():
@@ -1849,10 +1992,10 @@ func can_heal_target_from_cell(
 	unit_logic
 ) -> bool:
 
-	if healer_index == -1:
+	if healer_index == INVALID_UNIT:
 		return false
 
-	if target_index == -1:
+	if target_index == INVALID_UNIT:
 		return false
 
 	if healer_index >= units.size():
@@ -1892,6 +2035,12 @@ func get_best_healer_approach_tile(
 	unit_logic
 ) -> Vector2i:
 
+	if healer_index == INVALID_UNIT or target_index == INVALID_UNIT:
+		return INVALID_CELL
+
+	if healer_index >= units.size() or target_index >= units.size():
+		return INVALID_CELL
+
 	var healer = units[healer_index]
 	var target = units[target_index]
 
@@ -1905,7 +2054,7 @@ func get_best_healer_approach_tile(
 	)
 
 	var best_tile = healer["pos"]
-	var best_score = 999999
+	var best_score = NO_DISTANCE
 
 	for tile in move_tiles:
 

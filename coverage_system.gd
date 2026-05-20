@@ -3,17 +3,24 @@ extends Node
 # ==================================================
 # COVERAGE SYSTEM
 # ==================================================
-# Handles coverage state checks and delayed
-# coverage reaction damage.
+# Handles coverage state checks,
+# movement-path coverage detection,
+# and delayed coverage reaction damage.
 # ==================================================
 
+# ==================================================
+# SHARED COVERAGE CONSTANTS
+# ==================================================
+
+const INVALID_UNIT := -1
 
 # =========================
-# Returns true if a unit currently
-# has active coverage.
+# Returns true if a unit
+# currently has active coverage.
 #
 # Coverage requires:
-# - a valid facing direction
+# - valid unit index
+# - valid facing direction
 # - enough stamina remaining
 # =========================
 
@@ -21,6 +28,12 @@ func has_active_coverage(
 	units: Array,
 	unit_index: int
 ) -> bool:
+
+	if unit_index == INVALID_UNIT:
+		return false
+
+	if unit_index >= units.size():
+		return false
 
 	var unit = units[unit_index]
 
@@ -33,12 +46,20 @@ func has_active_coverage(
 	return true
 
 # =========================
-# Returns all enemies whose coverage
-# the moving unit ENTERED anywhere
-# along the actual movement path.
+# Returns all enemies whose
+# coverage the moving unit
+# entered anywhere along the
+# actual movement path.
 #
-# This checks each step of the path,
-# instead of only start -> destination.
+# This checks each step of
+# the path instead of only
+# start -> destination.
+#
+# A unit that starts inside
+# a coverage zone does not
+# trigger that same zone
+# unless it exits and re-enters
+# in future expanded logic.
 # =========================
 
 func get_enemies_entered_coverage_along_path(
@@ -49,6 +70,12 @@ func get_enemies_entered_coverage_along_path(
 ) -> Array[int]:
 
 	var covering_enemies: Array[int] = []
+
+	if unit_index == INVALID_UNIT:
+		return covering_enemies
+
+	if unit_index >= units.size():
+		return covering_enemies
 
 	if path_cells.size() <= 1:
 		return covering_enemies
@@ -83,10 +110,12 @@ func get_enemies_entered_coverage_along_path(
 	return covering_enemies
 
 # =========================
-# Resolves delayed coverage damage.
+# Resolves all delayed
+# coverage reactions against
+# the moving unit.
 #
-# Multiple overlapping coverage zones
-# each resolve individually.
+# Multiple overlapping coverage
+# zones each resolve individually.
 #
 # Returns:
 # - true if moving unit dies
@@ -99,6 +128,14 @@ func resolve_pending_coverage_if_needed(
 	selected_unit: int,
 	pending_coverage_enemies: Array[int]
 ) -> bool:
+
+	if selected_unit == INVALID_UNIT:
+		pending_coverage_enemies.clear()
+		return false
+
+	if selected_unit >= units.size():
+		pending_coverage_enemies.clear()
+		return false
 
 	if pending_coverage_enemies.is_empty():
 		return false
@@ -120,12 +157,17 @@ func resolve_pending_coverage_if_needed(
 
 	return false
 
-
 # =========================
-# Resolves a coverage reaction attack.
+# Resolves one coverage
+# reaction attack.
 #
-# The covering unit spends stamina
-# to perform the reaction attack.
+# The covering unit spends
+# counter stamina, then deals
+# reaction damage to the
+# moving unit.
+#
+# Returns true if the moving
+# unit dies.
 # =========================
 
 func resolve_coverage_reaction(
@@ -134,6 +176,18 @@ func resolve_coverage_reaction(
 	moving_unit: int,
 	covering_unit: int
 ) -> bool:
+
+	if moving_unit == INVALID_UNIT:
+		return false
+
+	if covering_unit == INVALID_UNIT:
+		return false
+
+	if moving_unit >= units.size():
+		return false
+
+	if covering_unit >= units.size():
+		return false
 
 	units[covering_unit]["stamina"] = max(
 		units[covering_unit]["stamina"]

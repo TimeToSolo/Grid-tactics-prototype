@@ -73,6 +73,8 @@ extends Node2D
 
 @onready var editor_state = $Systems/EditorState
 @onready var editor_render_system = $Systems/EditorRenderSystem
+@onready var editor_input_controller = $Systems/EditorInputController
+@onready var editor_objective_serializer = $Systems/EditorObjectiveSerializer
 
 # =========================
 # UI
@@ -253,108 +255,6 @@ func load_campaign_level():
 		deserialize_objective_zones(
 			current_objective_data["objective_zones"]
 		)
-
-	queue_redraw()
-
-# =========================
-# Handles map resize prompt input.
-# =========================
-
-func handle_editor_resize_input(event):
-
-	match event.keycode:
-
-		KEY_RIGHT:
-			editor_state.editor_resize_width += 1
-
-		KEY_LEFT:
-			editor_state.editor_resize_width = max(1, editor_state.editor_resize_width - 1)
-
-		KEY_UP:
-			editor_state.editor_resize_height += 1
-
-		KEY_DOWN:
-			editor_state.editor_resize_height = max(1, editor_state.editor_resize_height - 1)
-
-		KEY_ENTER:
-			map_data.resize_map(
-				editor_state.editor_resize_width,
-				editor_state.editor_resize_height
-			)
-
-			editor_state.editor_resize_mode = false
-
-		KEY_ESCAPE:
-			editor_state.editor_resize_mode = false
-
-	queue_redraw()
-	
-# =========================
-# Draws map resize prompt.
-# =========================
-
-func draw_editor_resize_ui():
-
-	if not editor_state.editor_resize_mode:
-		return
-
-	draw_rect(
-		Rect2(12, 120, 360, 130),
-		Color(0.0, 0.0, 0.0, 0.75)
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(24, 150),
-		"MAP SIZE",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		18,
-		Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(24, 180),
-		"Width: " + str(editor_state.editor_resize_width) + "   Left/Right",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		16,
-		Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(24, 205),
-		"Height: " + str(editor_state.editor_resize_height) + "   Up/Down",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		16,
-		Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(24, 235),
-		"Enter: confirm   Esc: cancel",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		16,
-		Color.YELLOW
-	)
-
-# =========================
-# Starts map resize mode.
-# =========================
-
-func start_editor_resize_mode():
-
-	if not editor_state.editor_mode:
-		return
-
-	editor_state.editor_resize_mode = true
-	editor_state.editor_resize_width = map_data.grid_width
-	editor_state.editor_resize_height = map_data.grid_height
 
 	queue_redraw()
 
@@ -604,9 +504,20 @@ func _draw():
 		editor_state,
 		hovered_cell
 	)
-	
-	draw_all_defender_leashes()
-	draw_selected_editor_unit_leash()
+
+	editor_render_system.draw_all_defender_leashes(
+		self,
+		map_data,
+		editor_state,
+		units
+	)
+
+	editor_render_system.draw_selected_editor_unit_leash(
+		self,
+		map_data,
+		editor_state,
+		units
+	)
 	
 	editor_render_system.draw_editor_unit_move_preview(
 		self,
@@ -635,63 +546,11 @@ func _draw():
 		mission_flow_controller,
 		units
 	)
-	draw_editor_resize_ui()
 
-# =========================
-# Draws all defender leash
-# zones while debug overlay
-# is enabled.
-#
-# Used for editor debugging.
-#
-# Purple overlay = defender
-# territory area.
-# =========================
-
-func draw_all_defender_leashes():
-
-	if not editor_state.editor_mode:
-		return
-
-	if not editor_state.show_all_defender_leashes:
-		return
-
-	for unit in units:
-
-		if not unit.has("ai_profile"):
-			continue
-
-		if unit["ai_profile"] != "defender":
-			continue
-
-		if not unit.has("home_pos"):
-			continue
-
-		if not unit.has("leash_range"):
-			continue
-
-		var occupied_tiles: Array[Vector2i] = []
-
-		var leash_tiles = map_data.get_move_range(
-			unit["home_pos"],
-			unit["leash_range"],
-			occupied_tiles
-		)
-
-		for tile in leash_tiles:
-
-			if not map_data.is_inside_grid(tile):
-				continue
-
-			draw_rect(
-				map_data.grid_rect(tile),
-				Color(0.6, 0.2, 1.0, 0.12)
-			)
-
-		draw_rect(
-			map_data.grid_rect(unit["home_pos"]),
-			Color(0.6, 0.2, 1.0, 0.35)
-		)
+	editor_render_system.draw_editor_resize_ui(
+		self,
+		editor_state
+	)
 
 # =========================
 # Returns zone name used by
@@ -865,60 +724,6 @@ func remove_cell_from_selected_objective_zone(cell: Vector2i):
 	editor_state.objective_zones[editor_state.selected_objective_zone].erase(cell)
 
 	queue_redraw()
-
-# =========================
-# Draws leash range preview
-# for the currently selected
-# editor unit.
-#
-# Blue overlay = allowed
-# defender movement area.
-# =========================
-
-func draw_selected_editor_unit_leash():
-
-	if not editor_state.editor_mode:
-		return
-
-	if editor_state.editor_palette != "select":
-		return
-
-	if editor_state.selected_editor_unit == -1:
-		return
-
-	if editor_state.selected_editor_unit >= units.size():
-		return
-
-	var unit = units[editor_state.selected_editor_unit]
-
-	if not unit.has("home_pos"):
-		return
-
-	if not unit.has("leash_range"):
-		return
-
-	var occupied_tiles: Array[Vector2i] = []
-
-	var leash_tiles = map_data.get_move_range(
-		unit["home_pos"],
-		unit["leash_range"],
-		occupied_tiles
-	)
-
-	for tile in leash_tiles:
-
-		if not map_data.is_inside_grid(tile):
-			continue
-
-		draw_rect(
-			map_data.grid_rect(tile),
-			Color(0.2, 0.5, 1.0, 0.22)
-		)
-
-	draw_rect(
-		map_data.grid_rect(unit["home_pos"]),
-		Color(0.0, 0.8, 1.0, 0.45)
-	)
 
 # =========================
 # Draws the inspected enemy's
@@ -1469,198 +1274,6 @@ func deserialize_objective_zones(data: Dictionary):
 			)
 
 # =========================
-# Adds a new objective stage
-# after the current stage.
-# =========================
-
-func add_editor_objective_stage():
-
-	var new_stage = get_default_objective_stage(
-		"defeat_enemy_count"
-	)
-
-	editor_state.editor_objective_stages.insert(
-		editor_state.editor_objective_stage_index + 1,
-		new_stage
-	)
-
-	editor_state.editor_objective_stage_index += 1
-
-	queue_redraw()
-
-# =========================
-# Deletes current objective
-# stage if more than one
-# stage exists.
-# =========================
-
-func delete_editor_objective_stage():
-
-	if editor_state.editor_objective_stages.size() <= 1:
-		return
-
-	editor_state.editor_objective_stages.remove_at(
-		editor_state.editor_objective_stage_index
-	)
-
-	editor_state.editor_objective_stage_index = clamp(
-		editor_state.editor_objective_stage_index,
-		0,
-		editor_state.editor_objective_stages.size() - 1
-	)
-
-	queue_redraw()
-
-# =========================
-# Changes selected objective
-# stage in the editor.
-# =========================
-
-func change_editor_objective_stage(direction: int):
-
-	editor_state.editor_objective_stage_index += direction
-
-	if editor_state.editor_objective_stage_index < 0:
-		editor_state.editor_objective_stage_index = (
-			editor_state.editor_objective_stages.size() - 1
-		)
-
-	if editor_state.editor_objective_stage_index >= editor_state.editor_objective_stages.size():
-		editor_state.editor_objective_stage_index = 0
-
-	queue_redraw()
-
-# =========================
-# Cycles selected objective
-# stage type.
-# =========================
-
-func cycle_editor_objective_stage_type():
-
-	var current_stage = editor_state.editor_objective_stages[
-		editor_state.editor_objective_stage_index
-	]
-
-	var current_type = current_stage.get(
-		"type",
-		"defeat_enemy_count"
-	)
-
-	var current_index = editor_state.editor_objective_stage_types.find(
-		current_type
-	)
-
-	if current_index == -1:
-		current_index = 0
-
-	var next_index = (
-		current_index + 1
-	) % editor_state.editor_objective_stage_types.size()
-
-	var next_type = editor_state.editor_objective_stage_types[next_index]
-
-	editor_state.editor_objective_stages[
-		editor_state.editor_objective_stage_index
-	] = get_default_objective_stage(next_type)
-
-	queue_redraw()
-
-# =========================
-# Returns default data for
-# an objective stage type.
-# =========================
-
-func get_default_objective_stage(stage_type: String) -> Dictionary:
-
-	match stage_type:
-
-		"rout":
-			return {
-				"type": "rout",
-				"on_complete": "advance_stage"
-			}
-
-		"retreat":
-			return {
-				"type": "retreat",
-				"zone": "retreat_zone",
-				"on_complete": "victory"
-			}
-
-		_:
-			return {
-				"type": "defeat_enemy_count",
-				"required_count": 1,
-				"on_complete": "advance_stage"
-			}
-
-# =========================
-# Adjusts numeric parameter
-# for selected objective stage.
-# =========================
-
-func adjust_editor_objective_stage_value(direction: int):
-
-	var current_stage = editor_state.editor_objective_stages[
-		editor_state.editor_objective_stage_index
-	]
-
-	match current_stage.get("type", ""):
-
-		"defeat_enemy_count":
-			current_stage["required_count"] = max(
-				1,
-				current_stage.get("required_count", 1) + direction
-			)
-
-	editor_state.editor_objective_stages[
-		editor_state.editor_objective_stage_index
-	] = current_stage
-
-	queue_redraw()
-
-# =========================
-# Cycles completion result
-# for selected objective stage.
-# =========================
-
-func cycle_editor_objective_completion():
-
-	var completion_options = [
-		"advance_stage",
-		"spawn_reinforcements",
-		"victory"
-	]
-
-	var current_stage = editor_state.editor_objective_stages[
-		editor_state.editor_objective_stage_index
-	]
-
-	var current_completion = current_stage.get(
-		"on_complete",
-		"advance_stage"
-	)
-
-	var current_index = completion_options.find(
-		current_completion
-	)
-
-	if current_index == -1:
-		current_index = 0
-
-	var next_index = (
-		current_index + 1
-	) % completion_options.size()
-
-	current_stage["on_complete"] = completion_options[next_index]
-
-	editor_state.editor_objective_stages[
-		editor_state.editor_objective_stage_index
-	] = current_stage
-
-	queue_redraw()
-
-# =========================
 # Resolves objective stage
 # completion events.
 #
@@ -1958,17 +1571,12 @@ func _process(_delta):
 	if action_menu_controller.is_open():
 		action_menu_controller.update_hovered_index_from_mouse()
 
-	if (
-		editor_state.editor_mode
-		and editor_state.editor_palette == "terrain"
-		and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-		and not Input.is_key_pressed(KEY_CTRL)
-		and not editor_state.editor_rect_dragging
-	):
-		editor_system.paint_tile(
+	if editor_state.editor_mode:
+		editor_input_controller.handle_mouse_drag_paint(
+			editor_state,
+			editor_system,
 			map_data,
-			hovered_cell,
-			editor_state.selected_editor_tile
+			hovered_cell
 		)
 
 	if (
@@ -2032,18 +1640,37 @@ func handle_keyboard_input(event):
 		return
 
 	if editor_state.editor_resize_mode:
-		handle_editor_resize_input(event)
+
+		if editor_input_controller.handle_editor_resize_input(
+			event,
+			editor_state,
+			map_data
+		):
+			queue_redraw()
+
 		return
+
+	if editor_state.editor_mode:
+		if editor_input_controller.handle_keyboard_input(
+			event,
+			editor_state,
+			editor_system,
+			mission_flow_controller,
+			map_data,
+			units,
+			unit_data,
+			map_serializer,
+			current_objective_data,
+			editor_objective_serializer
+		):
+			queue_redraw()
+			return
 
 	if not editor_state.editor_mode:
 		if tactical_input_controller.handle_keyboard_event(event):
 			return
 
 	match event.keycode:
-
-		KEY_A:
-			if editor_state.editor_mode:
-				editor_system.cycle_editor_ai_profile(editor_state)
 
 		KEY_E:
 			editor_state.editor_mode = !editor_state.editor_mode
@@ -2052,29 +1679,6 @@ func handle_keyboard_input(event):
 				setup_current_mission_objective()
 				await start_battle_flow()
 			queue_redraw()
-
-		KEY_F:
-			if editor_state.editor_mode:
-				editor_system.rotate_editor_facing(editor_state)
-
-		KEY_M:
-			start_editor_resize_mode()
-
-		KEY_S:
-			if editor_state.editor_mode and event.ctrl_pressed:
-				save_editor_map()
-
-		KEY_L:
-			if editor_state.editor_mode and event.ctrl_pressed:
-				load_editor_map()
-
-		KEY_F5:
-			if editor_state.editor_mode:
-				save_editor_map()
-
-		KEY_F6:
-			if editor_state.editor_mode:
-				load_editor_map()
 
 		KEY_F9:
 			if editor_state.editor_mode:
@@ -2088,131 +1692,9 @@ func handle_keyboard_input(event):
 			if editor_state.editor_mode:
 				load_current_campaign_mission()
 
-		KEY_COMMA:
-			if editor_state.editor_mode:
-				mission_flow_controller.change_campaign_level(-1)
-				queue_redraw()
-
-		KEY_PERIOD:
-			if editor_state.editor_mode:
-				mission_flow_controller.change_campaign_level(1)
-				queue_redraw()
-
 		KEY_TAB:
-			if editor_state.editor_mode:
-				editor_system.cycle_editor_palette(editor_state)
-			else:
+			if not editor_state.editor_mode:
 				jump_to_next_unmoved_ally()
-
-		KEY_BRACKETLEFT:
-			if editor_state.editor_mode:
-				editor_system.change_editor_map_slot(editor_state, -1)
-
-		KEY_BRACKETRIGHT:
-			if editor_state.editor_mode:
-				editor_system.change_editor_map_slot(editor_state, 1)
-
-		KEY_EQUAL:
-
-			if (
-				editor_state.editor_mode
-				and editor_state.editor_palette == "select"
-			):
-
-				editor_system.increase_unit_leash_range(
-					units,
-					editor_state.selected_editor_unit
-				)
-
-				queue_redraw()
-
-		KEY_MINUS:
-
-			if (
-				editor_state.editor_mode
-				and editor_state.editor_palette == "select"
-			):
-
-				editor_system.decrease_unit_leash_range(
-					units,
-					editor_state.selected_editor_unit
-				)
-
-				queue_redraw()
-
-		KEY_DELETE:
-			if editor_state.editor_mode:
-				delete_editor_objective_stage()
-
-		KEY_O:
-			if editor_state.editor_mode:
-				add_editor_objective_stage()
-
-		KEY_1:
-			if editor_state.editor_palette == "terrain":
-				editor_state.selected_editor_tile = "."
-			else:
-				editor_state.selected_editor_unit_class = "fighter"
-				editor_system.validate_selected_editor_ai_profile(editor_state)
-				queue_redraw()
-
-		KEY_2:
-			if editor_state.editor_palette == "terrain":
-				editor_state.selected_editor_tile = "W"
-			else:
-				editor_state.selected_editor_unit_class = "tank"
-				editor_system.validate_selected_editor_ai_profile(editor_state)
-				queue_redraw()
-
-		KEY_3:
-			if editor_state.editor_palette == "terrain":
-				editor_state.selected_editor_tile = "R"
-			else:
-				editor_state.selected_editor_unit_class = "lancer"
-				editor_system.validate_selected_editor_ai_profile(editor_state)
-				queue_redraw()
-
-		KEY_4:
-			if editor_state.editor_palette != "terrain":
-				editor_state.selected_editor_unit_class = "duelist"
-				editor_system.validate_selected_editor_ai_profile(editor_state)
-				queue_redraw()
-
-		KEY_5:
-			if editor_state.editor_palette != "terrain":
-				editor_state.selected_editor_unit_class = "healer"
-				editor_system.validate_selected_editor_ai_profile(editor_state)
-				queue_redraw()
-
-		KEY_6:
-			if editor_state.editor_palette != "terrain":
-				editor_state.selected_editor_unit_class = "archer"
-				editor_system.validate_selected_editor_ai_profile(editor_state)
-				queue_redraw()
-
-		KEY_9:
-			if editor_state.editor_mode:
-				change_editor_objective_stage(-1)
-
-		KEY_0:
-			if editor_state.editor_mode:
-				change_editor_objective_stage(1)
-
-		KEY_P:
-			if editor_state.editor_mode:
-				cycle_editor_objective_stage_type()
-
-		KEY_BRACELEFT:
-			if editor_state.editor_mode:
-				adjust_editor_objective_stage_value(-1)
-
-		KEY_BRACERIGHT:
-			if editor_state.editor_mode:
-				adjust_editor_objective_stage_value(1)
-
-		KEY_BACKSLASH:
-			if editor_state.editor_mode:
-				cycle_editor_objective_completion()
 
 		KEY_C:
 			cycle_coverage_mode()
@@ -2222,11 +1704,6 @@ func handle_keyboard_input(event):
 
 		KEY_X:
 			cancel_pending_action()
-
-		KEY_F7:
-			if editor_state.editor_mode:
-				editor_state.show_all_defender_leashes = !editor_state.show_all_defender_leashes
-				queue_redraw()
 
 # =========================
 # Cycles coverage overlay display.
@@ -2374,51 +1851,26 @@ func handle_mouse_input(event):
 		if action_menu_controller.handle_mouse_click(event):
 			return
 
+	if editor_state.editor_mode:
+
+		if editor_input_controller.handle_mouse_input(
+			event,
+			editor_state,
+			editor_system,
+			map_data,
+			units,
+			unit_query,
+			unit_data,
+			hovered_cell
+		):
+			queue_redraw()
+			return
+
 	# =========================
 	# Right click behavior
 	# =========================
 
 	if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-
-		if editor_state.editor_mode:
-
-			if editor_state.editor_palette == "select":
-
-				editor_state.selected_editor_unit = -1
-
-				editor_state.editor_selected_rect_start = Vector2i(-1, -1)
-				editor_state.editor_selected_rect_end = Vector2i(-1, -1)
-
-				editor_state.editor_select_dragging = false
-				editor_state.editor_select_start_cell = Vector2i(-1, -1)
-
-				queue_redraw()
-				return
-
-			if editor_state.editor_palette == "zone":
-
-				remove_cell_from_selected_objective_zone(hovered_cell)
-				queue_redraw()
-				return
-
-			if editor_state.editor_palette == "terrain":
-
-				editor_system.paint_tile(
-					map_data,
-					hovered_cell,
-					"."
-				)
-
-			else:
-
-				editor_system.remove_unit_at(
-					units,
-					unit_query,
-					hovered_cell
-				)
-
-			queue_redraw()
-			return
 
 		if inspected_unit_id != -1:
 			inspected_unit_id = -1
@@ -2434,149 +1886,8 @@ func handle_mouse_input(event):
 	# Left click behavior
 	# =========================
 
-	if event.button_index == MOUSE_BUTTON_LEFT:
-
-		if editor_state.editor_mode:
-
-			if event.pressed:
-
-				if editor_state.editor_palette == "select":
-
-					var clicked_unit = unit_query.get_unit_at(
-						units,
-						hovered_cell
-					)
-
-					if clicked_unit != -1:
-
-						editor_state.selected_editor_unit = clicked_unit
-
-						editor_state.editor_selected_rect_start = Vector2i(-1, -1)
-						editor_state.editor_selected_rect_end = Vector2i(-1, -1)
-
-						editor_state.editor_unit_move_dragging = true
-						editor_state.editor_unit_move_start_cell = hovered_cell
-
-						queue_redraw()
-						return
-
-					editor_state.selected_editor_unit = -1
-
-					if editor_system.editor_cell_is_inside_selected_area(editor_state, hovered_cell):
-
-						editor_state.editor_move_dragging = true
-						editor_state.editor_move_start_cell = hovered_cell
-
-					else:
-
-						editor_state.editor_select_dragging = true
-						editor_state.editor_select_start_cell = hovered_cell
-
-					return
-
-				if event.ctrl_pressed:
-
-					editor_state.editor_rect_dragging = true
-					editor_state.editor_rect_start_cell = hovered_cell
-					return
-
-				handle_left_click()
-				return
-
-			if not event.pressed and editor_state.editor_unit_move_dragging:
-
-				var offset = hovered_cell - editor_state.editor_unit_move_start_cell
-
-				if (
-					editor_state.selected_editor_unit != -1
-					and editor_state.selected_editor_unit < units.size()
-					and offset != Vector2i.ZERO
-				):
-
-					var target_cell = units[editor_state.selected_editor_unit]["pos"] + offset
-
-					if (
-						map_data.is_inside_grid(target_cell)
-						and not map_data.blocks_movement(target_cell)
-					):
-
-						var occupied_unit = unit_query.get_unit_at(
-							units,
-							target_cell
-						)
-
-						if (
-							occupied_unit == -1
-							or occupied_unit == editor_state.selected_editor_unit
-						):
-
-							units[editor_state.selected_editor_unit]["pos"] = target_cell
-
-							if units[editor_state.selected_editor_unit].has("home_pos"):
-								units[editor_state.selected_editor_unit]["home_pos"] += offset
-
-				editor_state.editor_unit_move_dragging = false
-				editor_state.editor_unit_move_start_cell = Vector2i(-1, -1)
-
-				queue_redraw()
-				return
-
-			if not event.pressed and editor_state.editor_move_dragging:
-
-				var offset = hovered_cell - editor_state.editor_move_start_cell
-
-				editor_system.move_selection(
-					map_data,
-					units,
-					editor_state.editor_selected_rect_start,
-					editor_state.editor_selected_rect_end,
-					offset
-				)
-
-				editor_state.editor_selected_rect_start += offset
-				editor_state.editor_selected_rect_end += offset
-
-				editor_state.editor_move_dragging = false
-				editor_state.editor_move_start_cell = Vector2i(-1, -1)
-
-				queue_redraw()
-				return
-
-			if not event.pressed and editor_state.editor_select_dragging:
-
-				editor_state.editor_selected_rect_start = Vector2i(
-					min(editor_state.editor_select_start_cell.x, hovered_cell.x),
-					min(editor_state.editor_select_start_cell.y, hovered_cell.y)
-				)
-
-				editor_state.editor_selected_rect_end = Vector2i(
-					max(editor_state.editor_select_start_cell.x, hovered_cell.x),
-					max(editor_state.editor_select_start_cell.y, hovered_cell.y)
-				)
-
-				editor_state.editor_select_dragging = false
-				editor_state.editor_select_start_cell = Vector2i(-1, -1)
-
-				queue_redraw()
-				return
-
-			if not event.pressed and editor_state.editor_rect_dragging:
-
-				editor_system.fill_rect(
-					map_data,
-					editor_state.editor_rect_start_cell,
-					hovered_cell,
-					editor_state.selected_editor_tile
-				)
-
-				editor_state.editor_rect_dragging = false
-				editor_state.editor_rect_start_cell = Vector2i(-1, -1)
-
-				queue_redraw()
-				return
-
-		if event.pressed:
-			handle_left_click()
+	if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		handle_left_click()
 
 # =========================
 # Main left-click handler.
@@ -2587,78 +1898,6 @@ func handle_left_click():
 	var clicked_cell = hovered_cell
 
 	if not map_data.is_inside_grid(clicked_cell):
-		return
-
-	# =========================
-	# Editor mode terrain painting
-	# =========================
-
-	if editor_state.editor_mode:
-
-		if editor_state.editor_palette == "terrain":
-
-			editor_system.paint_tile(
-				map_data,
-				clicked_cell,
-				editor_state.selected_editor_tile
-			)
-
-		elif editor_state.editor_palette == "zone":
-
-			add_cell_to_selected_objective_zone(clicked_cell)
-
-		elif editor_state.editor_palette == "player_unit":
-
-			editor_system.place_unit(
-				units,
-				unit_query,
-				unit_data,
-				map_data,
-				clicked_cell,
-				editor_state.selected_editor_unit_class,
-				"player",
-				editor_state.selected_editor_facing,
-				editor_state.selected_editor_ai_profile
-			)
-
-		elif editor_state.editor_palette == "enemy_unit":
-
-			editor_system.place_unit(
-				units,
-				unit_query,
-				unit_data,
-				map_data,
-				clicked_cell,
-				editor_state.selected_editor_unit_class,
-				"enemy",
-				editor_state.selected_editor_facing,
-				editor_state.selected_editor_ai_profile
-			)
-
-		elif editor_state.editor_palette == "reinforcement":
-
-			editor_system.place_unit(
-				units,
-				unit_query,
-				unit_data,
-				map_data,
-				clicked_cell,
-				editor_state.selected_editor_unit_class,
-				"enemy",
-				editor_state.selected_editor_facing,
-				editor_state.selected_editor_ai_profile
-			)
-
-			var placed_unit = unit_query.get_unit_at(
-				units,
-				clicked_cell
-			)
-
-			if placed_unit != -1:
-				units[placed_unit]["reinforcement_stage"] = editor_state.editor_reinforcement_stage
-				units[placed_unit]["starts_hidden"] = true
-
-		queue_redraw()
 		return
 
 	if selected_unit != -1 and has_pending_move():

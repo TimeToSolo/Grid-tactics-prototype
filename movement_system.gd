@@ -3,16 +3,24 @@ extends Node
 # ==================================================
 # MOVEMENT SYSTEM
 # ==================================================
-# Handles movement finalization and facing helpers.
+# Handles movement preview finalization,
+# pending movement setup, and facing helpers.
 # ==================================================
 
+# ==================================================
+# SHARED MOVEMENT CONSTANTS
+# ==================================================
+
+const INVALID_CELL := Vector2i(-1, -1)
+const INVALID_UNIT := -1
 
 # =========================
 # Returns all valid lancer
 # facing-selection tiles.
 #
-# Converts valid lancer target tiles
-# into legal facing-selection tiles.
+# Converts valid lancer target
+# tiles into legal facing-
+# selection tiles.
 # =========================
 
 func get_valid_lancer_facing_tiles(
@@ -23,6 +31,7 @@ func get_valid_lancer_facing_tiles(
 ) -> Array[Vector2i]:
 
 	var valid_tiles: Array[Vector2i] = []
+
 	var lancer_tiles = unit_logic.get_attack_choice_tiles(
 		pending_move_cell,
 		"lancer",
@@ -30,6 +39,7 @@ func get_valid_lancer_facing_tiles(
 	)
 
 	for cell in lancer_tiles:
+
 		var facing = action_query.get_lancer_facing_from_target(
 			pending_move_cell,
 			cell
@@ -41,7 +51,15 @@ func get_valid_lancer_facing_tiles(
 	return valid_tiles
 
 # =========================
-# Finalizes movement facing selection.
+# Finalizes movement after
+# the player chooses a facing
+# direction.
+#
+# Applies:
+# - facing direction
+# - acted state
+# - pending coverage damage
+# - movement stamina cost
 #
 # Returns:
 # - unit_died
@@ -64,10 +82,10 @@ func handle_facing_click(
 	valid_lancer_tiles: Array[Vector2i]
 ) -> Dictionary:
 
-	if selected_unit == -1:
+	if selected_unit == INVALID_UNIT:
 		return {}
 
-	if pending_move_cell == Vector2i(-1, -1):
+	if pending_move_cell == INVALID_CELL:
 		return {}
 
 	var valid_facing_click = false
@@ -123,15 +141,23 @@ func handle_facing_click(
 
 	return {
 		"unit_died": false,
-		"remove_index": -1
+		"remove_index": INVALID_UNIT
 	}
 
 # =========================
-# Handles clicking a valid movement tile.
+# Handles clicking a valid
+# movement tile.
 #
-# The unit visually moves immediately,
-# but the move is not finalized until
-# the player confirms an action/facing/wait.
+# The unit visually moves
+# immediately, but the move
+# is not finalized until the
+# player confirms an action,
+# facing direction, or wait.
+#
+# Also calculates:
+# - movement distance
+# - pending coverage reactions
+# - final pending move cell
 #
 # Returns pending movement state.
 # =========================
@@ -149,7 +175,7 @@ func handle_move_tile_click(
 	path_cells: Array[Vector2i]
 ) -> Dictionary:
 
-	if selected_unit == -1:
+	if selected_unit == INVALID_UNIT:
 		return {}
 
 	if (
@@ -182,7 +208,10 @@ func handle_move_tile_click(
 	var movement_path: Array[Vector2i] = path_cells.duplicate()
 
 	if movement_path.is_empty():
-		movement_path = [selected_unit_start_cell, clicked_cell]
+		movement_path = [
+			selected_unit_start_cell,
+			clicked_cell
+		]
 
 	var pending_coverage_enemies = coverage_system.get_enemies_entered_coverage_along_path(
 		units,

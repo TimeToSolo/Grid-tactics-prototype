@@ -7,9 +7,24 @@ extends Node
 # the currently hovered tile is a valid action target.
 # ==================================================
 
+# ==================================================
+# SHARED HOVER QUERY CONSTANTS
+# ==================================================
+
+const INVALID_UNIT := -1
 
 # =========================
-# Returns true if hovering a valid attack target.
+# Returns true if hovering
+# a valid attack target.
+#
+# Requirements:
+# - selected unit exists
+# - movement is pending
+# - hovered tile is in attack range
+# - hovered unit is an enemy
+#
+# Healers use adjacent attack
+# range for offensive targeting.
 # =========================
 
 func is_hovering_attackable_enemy(
@@ -23,7 +38,10 @@ func is_hovering_attackable_enemy(
 	map_data
 ) -> bool:
 
-	if selected_unit == -1:
+	if selected_unit == INVALID_UNIT:
+		return false
+
+	if selected_unit >= units.size():
 		return false
 
 	if not has_pending_move:
@@ -32,11 +50,14 @@ func is_hovering_attackable_enemy(
 	var attack_tiles: Array[Vector2i]
 
 	if units[selected_unit]["class"] == "healer":
+
 		attack_tiles = unit_logic.get_adjacent_choice_tiles(
 			pending_move_cell,
 			map_data
 		)
+
 	else:
+
 		attack_tiles = unit_logic.get_attack_choice_tiles(
 			pending_move_cell,
 			units[selected_unit]["class"],
@@ -57,11 +78,18 @@ func is_hovering_attackable_enemy(
 		hovered_unit
 	)
 
-
 # =========================
-# Returns true if hovering a healable ally.
+# Returns true if hovering
+# a healable ally.
 #
-# Uses healer support range, not lancer range.
+# Requirements:
+# - selected unit is a healer
+# - movement is pending
+# - hovered tile is in heal range
+# - hovered unit is an ally
+#
+# Uses healer support range,
+# not lancer or attack range.
 # =========================
 
 func is_hovering_healable_ally(

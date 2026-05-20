@@ -10,13 +10,19 @@ extends Node
 # - simple unit queries
 # ==================================================
 
+# ==================================================
+# SHARED UNIT QUERY CONSTANTS
+# ==================================================
+
+const INVALID_UNIT := -1
 
 # =========================
-# Returns unit index at a tile.
+# Returns the unit index
+# occupying a tile.
 #
 # Returns:
 # - unit index
-# - or -1 if empty
+# - INVALID_UNIT if empty
 # =========================
 
 func get_unit_at(
@@ -29,11 +35,11 @@ func get_unit_at(
 		if units[i]["pos"] == cell:
 			return i
 
-	return -1
-
+	return INVALID_UNIT
 
 # =========================
-# Returns true if a tile contains any unit.
+# Returns true if a tile
+# contains any unit.
 # =========================
 
 func is_tile_occupied(
@@ -41,12 +47,19 @@ func is_tile_occupied(
 	cell: Vector2i
 ) -> bool:
 
-	return get_unit_at(units, cell) != -1
-
+	return get_unit_at(
+		units,
+		cell
+	) != INVALID_UNIT
 
 # =========================
-# Returns true if selected unit
-# considers target unit an enemy.
+# Returns true if the target
+# unit is considered an enemy
+# of the selected unit.
+#
+# Requires:
+# - valid selected unit
+# - valid target unit
 # =========================
 
 func is_enemy_unit(
@@ -55,10 +68,10 @@ func is_enemy_unit(
 	target_unit: int
 ) -> bool:
 
-	if selected_unit == -1:
+	if selected_unit == INVALID_UNIT:
 		return false
 
-	if target_unit == -1:
+	if target_unit == INVALID_UNIT:
 		return false
 
 	return (
@@ -66,10 +79,14 @@ func is_enemy_unit(
 		!= units[selected_unit]["team"]
 	)
 
-
 # =========================
-# Returns true if selected unit
-# considers target unit an ally.
+# Returns true if the target
+# unit is considered an ally
+# of the selected unit.
+#
+# Requires:
+# - valid selected unit
+# - valid target unit
 # =========================
 
 func is_ally_unit(
@@ -78,10 +95,10 @@ func is_ally_unit(
 	target_unit: int
 ) -> bool:
 
-	if selected_unit == -1:
+	if selected_unit == INVALID_UNIT:
 		return false
 
-	if target_unit == -1:
+	if target_unit == INVALID_UNIT:
 		return false
 
 	return (
@@ -89,11 +106,12 @@ func is_ally_unit(
 		== units[selected_unit]["team"]
 	)
 
-
 # =========================
-# Returns enemy-occupied tiles.
+# Returns all enemy-occupied
+# tiles relative to the given unit.
 #
-# Used to prevent movement through enemies.
+# Used to prevent movement
+# through enemy units.
 # =========================
 
 func get_enemy_occupied_tiles(
@@ -102,6 +120,12 @@ func get_enemy_occupied_tiles(
 ) -> Array[Vector2i]:
 
 	var occupied: Array[Vector2i] = []
+
+	if unit_index == INVALID_UNIT:
+		return occupied
+
+	if unit_index >= units.size():
+		return occupied
 
 	var unit_team = units[unit_index]["team"]
 
@@ -115,9 +139,9 @@ func get_enemy_occupied_tiles(
 
 	return occupied
 
-
 # =========================
-# Returns true if selected unit is healer.
+# Returns true if the selected
+# unit is a healer.
 # =========================
 
 func selected_unit_is_healer(
@@ -125,21 +149,26 @@ func selected_unit_is_healer(
 	selected_unit: int
 ) -> bool:
 
-	if selected_unit == -1:
+	if selected_unit == INVALID_UNIT:
+		return false
+
+	if selected_unit >= units.size():
 		return false
 
 	return units[selected_unit]["class"] == "healer"
 
 # =========================
-# Returns the current array index
-# of a unit with the given unique ID.
+# Returns the current array
+# index of a unit with the
+# given unique ID.
 #
-# Used to safely track units even if
-# array indices change after removals.
+# Used to safely track units
+# even if array indices shift
+# after removals.
 #
 # Returns:
 # - unit index
-# - or -1 if not found
+# - INVALID_UNIT if not found
 # =========================
 
 func get_unit_index_by_id(
@@ -149,18 +178,22 @@ func get_unit_index_by_id(
 
 	for i in range(units.size()):
 
-		if units[i].has("id") and units[i]["id"] == unit_id:
+		if (
+			units[i].has("id")
+			and units[i]["id"] == unit_id
+		):
 			return i
 
-	return -1
+	return INVALID_UNIT
 
 # =========================
-# Returns all occupied tiles except
-# the selected unit's current tile.
+# Returns all occupied tiles
+# except the specified unit's
+# current tile.
 #
-# Used by movement systems that should
-# prevent stacking with any unit,
-# regardless of team.
+# Used by movement systems
+# that should prevent stacking
+# with any unit regardless of team.
 # =========================
 
 func get_all_occupied_tiles_except_unit(

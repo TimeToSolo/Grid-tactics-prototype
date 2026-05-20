@@ -28,6 +28,13 @@ var directions: Array[Vector2i] = [
 	Vector2i(-1, -1)
 ]
 
+# ==================================================
+# SHARED UNIT LOGIC CONSTANTS
+# ==================================================
+
+const INVALID_DIRECTION := -1
+const ARCHER_MAX_RANGE_SQUARED := 18
+const HEAL_RANGE_SQUARED := 5
 
 # ==================================================
 # UNIT DISPLAY
@@ -77,10 +84,10 @@ func get_attack_tiles(
 	map_data
 ) -> Array[Vector2i]:
 
-	var move_tiles_local = map_data.get_move_range(start, move_points)
+	var move_tiles = map_data.get_move_range(start, move_points)
 
 	return get_attack_tiles_from_move_tiles(
-		move_tiles_local,
+		move_tiles,
 		unit_class,
 		map_data
 	)
@@ -95,21 +102,21 @@ func get_attack_tiles(
 # =========================
 
 func get_attack_tiles_from_move_tiles(
-	move_tiles_local: Array[Vector2i],
+	move_tiles: Array[Vector2i],
 	unit_class: String,
 	map_data
 ) -> Array[Vector2i]:
 
 	var tiles: Array[Vector2i] = []
 
-	for move_tile in move_tiles_local:
+	for move_tile in move_tiles:
 
 		if is_adjacent_attacker(unit_class):
 
 			add_adjacent_attack_tiles(
 				tiles,
 				move_tile,
-				move_tiles_local,
+				move_tiles,
 				map_data
 			)
 
@@ -118,7 +125,7 @@ func get_attack_tiles_from_move_tiles(
 			add_lancer_attack_tiles(
 				tiles,
 				move_tile,
-				move_tiles_local,
+				move_tiles,
 				map_data
 			)
 
@@ -127,16 +134,25 @@ func get_attack_tiles_from_move_tiles(
 			add_archer_attack_tiles(
 				tiles,
 				move_tile,
-				move_tiles_local,
+				move_tiles,
 				map_data
 			)
 
 	return tiles
 
 # =========================
-# Returns attack targeting tiles from a specific center tile.
+# Returns attack targeting
+# tiles from a specific
+# center tile.
 #
-# Used after a unit has chosen a pending move tile.
+# Archer:
+# - LOS validated ranged targeting
+#
+# Lancer:
+# - adjacent + extended spear reach
+#
+# Other classes:
+# - adjacent targeting only
 # =========================
 
 func get_attack_choice_tiles(
@@ -163,8 +179,11 @@ func get_attack_choice_tiles(
 
 			var tile = center + offset
 
-			if map_data.is_inside_grid(tile):
-				tiles.append(tile)
+			try_add_unique_tile(
+				tiles,
+				tile,
+				map_data
+			)
 
 		return tiles
 
@@ -172,8 +191,11 @@ func get_attack_choice_tiles(
 
 		var tile = center + dir
 
-		if map_data.is_inside_grid(tile):
-			tiles.append(tile)
+		try_add_unique_tile(
+			tiles,
+			tile,
+			map_data
+		)
 
 	return tiles
 
@@ -204,11 +226,14 @@ func get_heal_choice_tiles(
 
 			var distance_squared = x * x + y * y
 
-			if distance_squared > 5:
+			if distance_squared > HEAL_RANGE_SQUARED:
 				continue
 
-			if map_data.is_inside_grid(tile):
-				tiles.append(tile)
+			try_add_unique_tile(
+				tiles,
+				tile,
+				map_data
+			)
 
 	return tiles
 
@@ -234,7 +259,7 @@ func is_adjacent_attacker(unit_class: String) -> bool:
 func add_adjacent_attack_tiles(
 	tiles: Array[Vector2i],
 	center: Vector2i,
-	move_tiles_local: Array[Vector2i],
+	move_tiles: Array[Vector2i],
 	map_data
 ):
 
@@ -245,7 +270,7 @@ func add_adjacent_attack_tiles(
 		if not map_data.is_inside_grid(target):
 			continue
 
-		if move_tiles_local.has(target):
+		if move_tiles.has(target):
 			continue
 
 		add_unique_tile(tiles, target)
@@ -260,7 +285,7 @@ func add_adjacent_attack_tiles(
 func add_lancer_attack_tiles(
 	tiles: Array[Vector2i],
 	center: Vector2i,
-	move_tiles_local: Array[Vector2i],
+	move_tiles: Array[Vector2i],
 	map_data
 ):
 
@@ -271,7 +296,7 @@ func add_lancer_attack_tiles(
 		if not map_data.is_inside_grid(target):
 			continue
 
-		if move_tiles_local.has(target):
+		if move_tiles.has(target):
 			continue
 
 		add_unique_tile(tiles, target)
@@ -287,7 +312,7 @@ func add_lancer_attack_tiles(
 func add_archer_attack_tiles(
 	tiles: Array[Vector2i],
 	center: Vector2i,
-	move_tiles_local: Array[Vector2i],
+	move_tiles: Array[Vector2i],
 	map_data
 ):
 
@@ -296,7 +321,7 @@ func add_archer_attack_tiles(
 
 			var target = center + Vector2i(x, y)
 
-			if move_tiles_local.has(target):
+			if move_tiles.has(target):
 				continue
 
 			if is_valid_archer_target(center, target, map_data):
@@ -387,7 +412,7 @@ func is_valid_archer_target(
 
 	var distance_squared = offset.x * offset.x + offset.y * offset.y
 
-	if distance_squared > 18:
+	if distance_squared > ARCHER_MAX_RANGE_SQUARED:
 		return false
 
 	if not map_data.is_inside_grid(target):
@@ -431,8 +456,11 @@ func get_adjacent_choice_tiles(
 
 		var tile = center + dir
 
-		if map_data.is_inside_grid(tile):
-			tiles.append(tile)
+		try_add_unique_tile(
+			tiles,
+			tile,
+			map_data
+		)
 
 	return tiles
 
@@ -496,7 +524,7 @@ func get_fighter_coverage(
 	var tiles: Array[Vector2i] = []
 	var index = directions.find(facing)
 
-	if index == -1:
+	if index == INVALID_DIRECTION:
 		return tiles
 
 	for offset in [-1, 0, 1]:
@@ -525,7 +553,7 @@ func get_tank_coverage(
 	var tiles: Array[Vector2i] = []
 	var index = directions.find(facing)
 
-	if index == -1:
+	if index == INVALID_DIRECTION:
 		return tiles
 
 	for offset in [-1, 0, 1]:
@@ -540,15 +568,15 @@ func get_tank_coverage(
 
 
 # =========================
-# Tank slow/control zone.
+# Returns tank slow/control tiles.
 #
-# Covers the full 5-tile frontal arc.
+# Covers a wider frontal arc
+# than hard coverage.
 #
-# Inner 3 tiles:
-# - also overlap with hard coverage
-#
-# Outer 2 tiles:
-# - slow/control only
+# Used for:
+# - movement slowdown
+# - positional pressure
+# - retreat denial
 # =========================
 
 func get_tank_slow_tiles(
@@ -559,7 +587,7 @@ func get_tank_slow_tiles(
 	var tiles: Array[Vector2i] = []
 	var index = directions.find(facing)
 
-	if index == -1:
+	if index == INVALID_DIRECTION:
 		return tiles
 
 	for offset in [-2, -1, 0, 1, 2]:
@@ -635,6 +663,23 @@ func get_duelist_coverage(
 # ==================================================
 # GENERAL HELPERS
 # ==================================================
+
+# =========================
+# Adds a tile if:
+# - inside the map
+# - not already present
+# =========================
+
+func try_add_unique_tile(
+	tiles: Array[Vector2i],
+	tile: Vector2i,
+	map_data
+):
+
+	if not map_data.is_inside_grid(tile):
+		return
+
+	add_unique_tile(tiles, tile)
 
 # =========================
 # Adds a tile only if it is not already present.

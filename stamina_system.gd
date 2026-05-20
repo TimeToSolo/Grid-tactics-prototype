@@ -3,16 +3,62 @@ extends Node
 # ==================================================
 # STAMINA SYSTEM
 # ==================================================
-# Handles stamina spending, stamina display previews,
-# and healer charge recovery.
+# Handles:
+# - movement stamina spending
+# - attack stamina spending
+# - support stamina spending
+# - stamina display previews
+# - healer charge recovery
 # ==================================================
 
+# ==================================================
+# SHARED STAMINA CONSTANTS
+# ==================================================
+
+const INVALID_UNIT := -1
+const MINIMUM_ARCHER_DAMAGE := 1
 
 # =========================
-# Spends stamina based on movement distance.
+# Returns true if a unit index
+# is invalid or outside the
+# current unit array.
+# =========================
+
+func unit_index_is_invalid(
+	units: Array,
+	unit_index: int
+) -> bool:
+
+	if unit_index == INVALID_UNIT:
+		return true
+
+	if unit_index >= units.size():
+		return true
+
+	return false
+
+# =========================
+# Returns stamina cost for
+# moving a given distance.
+# =========================
+
+func get_movement_stamina_cost(
+	unit,
+	move_distance: int
+) -> int:
+
+	return (
+		move_distance
+		* unit["move_stamina_cost"]
+	)
+
+# =========================
+# Spends stamina based on
+# movement distance.
 #
-# Moving farther reduces remaining
-# defensive reaction potential.
+# Moving farther reduces
+# remaining defensive reaction
+# potential.
 # =========================
 
 func spend_movement_stamina(
@@ -21,12 +67,15 @@ func spend_movement_stamina(
 	pending_move_distance: int
 ):
 
-	if unit_index == -1:
+	if unit_index_is_invalid(
+		units,
+		unit_index
+	):
 		return
 
-	var movement_cost = (
+	var movement_cost = get_movement_stamina_cost(
+		units[unit_index],
 		pending_move_distance
-		* units[unit_index]["move_stamina_cost"]
 	)
 
 	units[unit_index]["stamina"] = max(
@@ -34,16 +83,44 @@ func spend_movement_stamina(
 		0
 	)
 
+# =========================
+# Returns projected archer
+# damage based on current
+# stamina.
+#
+# Archer stamina cost is tied
+# to projected damage.
+# =========================
+
+func get_projected_archer_damage(
+	unit
+) -> int:
+
+	var attack_damage = min(
+		unit["attack"],
+		int(
+			floor(
+				float(unit["stamina"])
+				/ float(unit["stamina_per_damage"])
+			)
+		)
+	)
+
+	return max(
+		attack_damage,
+		MINIMUM_ARCHER_DAMAGE
+	)
 
 # =========================
-# Spends stamina when a unit attacks.
+# Spends stamina when a unit
+# attacks.
 #
 # Archer special rule:
 # - stamina spent is based on
 #   current projected damage
 #
 # Other classes:
-# - spend their attack stamina cost
+# - spend attack stamina cost
 # =========================
 
 func spend_attack_stamina(
@@ -51,20 +128,17 @@ func spend_attack_stamina(
 	unit_index: int
 ):
 
-	if unit_index == -1:
+	if unit_index_is_invalid(
+		units,
+		unit_index
+	):
 		return
 
 	if units[unit_index]["class"] == "archer":
 
-		var attack_damage = min(
-			units[unit_index]["attack"],
-			int(floor(
-				float(units[unit_index]["stamina"])
-				/ float(units[unit_index]["stamina_per_damage"])
-			))
+		var attack_damage = get_projected_archer_damage(
+			units[unit_index]
 		)
-
-		attack_damage = max(attack_damage, 1)
 
 		var stamina_cost = (
 			attack_damage
@@ -84,13 +158,15 @@ func spend_attack_stamina(
 		0
 	)
 
-
 # =========================
-# Returns displayed stamina for a unit.
+# Returns displayed stamina
+# for a unit.
 #
-# Pending movement does not actually spend
-# stamina until the action is confirmed,
-# but the UI should preview expected stamina.
+# Pending movement does not
+# actually spend stamina until
+# the action is confirmed, but
+# the UI should preview expected
+# stamina.
 # =========================
 
 func get_display_stamina(
@@ -101,15 +177,21 @@ func get_display_stamina(
 	pending_move_distance: int
 ) -> int:
 
+	if unit_index_is_invalid(
+		units,
+		unit_index
+	):
+		return 0
+
 	if unit_index != selected_unit:
 		return units[unit_index]["stamina"]
 
 	if not has_pending_move:
 		return units[unit_index]["stamina"]
 
-	var movement_cost = (
+	var movement_cost = get_movement_stamina_cost(
+		units[unit_index],
 		pending_move_distance
-		* units[unit_index]["move_stamina_cost"]
 	)
 
 	return max(
@@ -118,7 +200,36 @@ func get_display_stamina(
 	)
 
 # =========================
-# Spends stamina for a support action.
+# Returns stamina cost for
+# a support action.
+#
+# Supported actions:
+# - heal
+# - regen
+# =========================
+
+func get_support_stamina_cost(
+	unit,
+	support_action: String
+) -> int:
+
+	match support_action:
+
+		"heal":
+			return unit["heal_stamina_cost"]
+
+		"regen":
+			return unit["regen_stamina_cost"]
+
+		_:
+			return 0
+
+# =========================
+# Spends stamina for a
+# support action.
+#
+# Support actions also consume
+# one healer charge.
 # =========================
 
 func spend_support_stamina(
@@ -127,21 +238,19 @@ func spend_support_stamina(
 	support_action: String
 ):
 
-	if unit_index == -1:
+	if unit_index_is_invalid(
+		units,
+		unit_index
+	):
 		return
 
-	var stamina_cost = 0
+	var stamina_cost = get_support_stamina_cost(
+		units[unit_index],
+		support_action
+	)
 
-	match support_action:
-
-		"heal":
-			stamina_cost = units[unit_index]["heal_stamina_cost"]
-
-		"regen":
-			stamina_cost = units[unit_index]["regen_stamina_cost"]
-
-		_:
-			return
+	if stamina_cost <= 0:
+		return
 
 	units[unit_index]["stamina"] = max(
 		units[unit_index]["stamina"] - stamina_cost,
@@ -151,12 +260,45 @@ func spend_support_stamina(
 	units[unit_index]["heal_charges"] -= 1
 
 # =========================
-# Recovers healer charges based on
-# remaining stamina at turn end.
+# Returns healer charge
+# recovery amount based on
+# remaining stamina.
 #
-# 90+ stamina = +2 charges
-# 50+ stamina = +1 charge
-# Below 50 = no recovery
+# Recovery thresholds are
+# unit-data driven.
+# =========================
+
+func get_healer_charge_recovery_amount(
+	unit
+) -> int:
+
+	if (
+		unit["stamina"]
+		>= unit["charge_recovery_threshold_2"]
+	):
+		return 2
+
+	if (
+		unit["stamina"]
+		>= unit["charge_recovery_threshold_1"]
+	):
+		return 1
+
+	return 0
+
+# =========================
+# Recovers healer charges
+# based on remaining stamina
+# at turn end.
+#
+# High stamina recovery:
+# - +2 charges
+#
+# Medium stamina recovery:
+# - +1 charge
+#
+# Low stamina recovery:
+# - no recovery
 # =========================
 
 func recover_idle_healers(
@@ -172,19 +314,9 @@ func recover_idle_healers(
 		if unit["class"] != "healer":
 			continue
 
-		var recovery_amount = 0
-
-		if (
-			unit["stamina"]
-			>= unit["charge_recovery_threshold_2"]
-		):
-			recovery_amount = 2
-
-		elif (
-			unit["stamina"]
-			>= unit["charge_recovery_threshold_1"]
-		):
-			recovery_amount = 1
+		var recovery_amount = get_healer_charge_recovery_amount(
+			unit
+		)
 
 		unit["heal_charges"] = min(
 			unit["heal_charges"] + recovery_amount,

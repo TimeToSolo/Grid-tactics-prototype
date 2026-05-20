@@ -1,5 +1,17 @@
 extends Node
 
+# ==================================================
+# EDITOR SYSTEM
+# ==================================================
+# Handles:
+# - terrain painting
+# - editor unit placement/removal
+# - rectangle movement
+# - editor palette helpers
+# - AI profile validation
+# - editor map slot helpers
+# ==================================================
+
 # =========================
 # Paints terrain onto the map.
 # =========================
@@ -51,7 +63,8 @@ func fill_rect(
 			)
 
 # =========================
-# Removes any unit at a cell.
+# Removes the unit occupying
+# a grid cell, if one exists.
 # =========================
 
 func remove_unit_at(
@@ -77,6 +90,9 @@ func remove_unit_at(
 # Uses UnitData templates.
 # Also assigns the unit's AI profile
 # for automated behavior.
+#
+# Defender units automatically
+# receive default leash data.
 # =========================
 
 func place_unit(
@@ -279,6 +295,10 @@ func move_selection(
 
 		units.append(unit)
 
+# ==================================================
+# DEFENDER / LEASH HELPERS
+# ==================================================
+
 # =========================
 # Increases leash range for
 # a specific unit index.
@@ -290,11 +310,12 @@ func move_selection(
 # =========================
 
 func increase_unit_leash_range(
+	editor_state,
 	units: Array,
 	unit_index: int
 ):
 
-	if unit_index == -1:
+	if unit_index == editor_state.INVALID_UNIT:
 		return
 
 	if unit_index >= units.size():
@@ -319,11 +340,12 @@ func increase_unit_leash_range(
 # =========================
 
 func decrease_unit_leash_range(
+	editor_state,
 	units: Array,
 	unit_index: int
 ):
 
-	if unit_index == -1:
+	if unit_index == editor_state.INVALID_UNIT:
 		return
 
 	if unit_index >= units.size():
@@ -380,10 +402,10 @@ func editor_cell_is_inside_selected_area(
 	cell: Vector2i
 ) -> bool:
 
-	if editor_state.editor_selected_rect_start == Vector2i(-1, -1):
+	if editor_state.editor_selected_rect_start == editor_state.INVALID_CELL:
 		return false
 
-	if editor_state.editor_selected_rect_end == Vector2i(-1, -1):
+	if editor_state.editor_selected_rect_end == editor_state.INVALID_CELL:
 		return false
 
 	return (

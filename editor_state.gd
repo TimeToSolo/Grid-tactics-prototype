@@ -1,6 +1,13 @@
 extends Node
 
 # ==================================================
+# SHARED EDITOR CONSTANTS
+# ==================================================
+
+const INVALID_CELL := Vector2i(-1, -1)
+const INVALID_UNIT := -1
+
+# ==================================================
 # EDITOR STATE
 # ==================================================
 # Owns all editor-related state.
@@ -35,7 +42,7 @@ var selected_editor_ai_profile := "barbarian"
 
 var editor_rect_dragging := false
 
-var editor_rect_start_cell := Vector2i(-1, -1)
+var editor_rect_start_cell := INVALID_CELL
 
 # ==================================================
 # RESIZE STATE
@@ -53,11 +60,11 @@ var editor_resize_height := 16
 
 var editor_select_dragging := false
 
-var editor_select_start_cell := Vector2i(-1, -1)
+var editor_select_start_cell := INVALID_CELL
 
-var editor_selected_rect_start := Vector2i(-1, -1)
+var editor_selected_rect_start := INVALID_CELL
 
-var editor_selected_rect_end := Vector2i(-1, -1)
+var editor_selected_rect_end := INVALID_CELL
 
 # ==================================================
 # MOVE DRAGGING
@@ -65,7 +72,7 @@ var editor_selected_rect_end := Vector2i(-1, -1)
 
 var editor_move_dragging := false
 
-var editor_move_start_cell := Vector2i(-1, -1)
+var editor_move_start_cell := INVALID_CELL
 
 # ==================================================
 # MAP SLOT STATE
@@ -79,13 +86,13 @@ const MAX_EDITOR_MAP_SLOTS := 9
 # UNIT EDITOR STATE
 # ==================================================
 
-var selected_editor_unit := -1
+var selected_editor_unit := INVALID_UNIT
 
 var editor_reinforcement_stage := 1
 
 var editor_unit_move_dragging := false
 
-var editor_unit_move_start_cell := Vector2i(-1, -1)
+var editor_unit_move_start_cell := INVALID_CELL
 
 # ==================================================
 # DEBUG

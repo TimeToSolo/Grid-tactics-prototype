@@ -6,6 +6,12 @@ extends Node
 # Handles unit selection and selection-state setup.
 # ==================================================
 
+# ==================================================
+# SHARED SELECTION CONSTANTS
+# ==================================================
+
+const INVALID_CELL := Vector2i(-1, -1)
+const INVALID_UNIT := -1
 
 # =========================
 # Selects a unit and prepares
@@ -39,12 +45,12 @@ func select_unit(
 		"selected_unit_start_cell": selected_unit_start_cell,
 		"move_tiles": move_tiles,
 
-		"pending_move_cell": Vector2i(-1, -1),
+		"pending_move_cell": INVALID_CELL,
 		"pending_move_distance": 0,
 		"pending_coverage_enemies": [] as Array[int],
 
-		"pending_attack_target": -1,
-		"pending_support_target": -1,
+		"pending_attack_target": INVALID_UNIT,
+		"pending_support_target": INVALID_UNIT,
 
 		"awaiting_attack_confirmation": false,
 		"awaiting_support_confirmation": false,
@@ -55,10 +61,11 @@ func select_unit(
 # Handles clicking a unit or empty tile
 # during normal selection mode.
 #
-# Returns:
-# - clear_selection
-# - select_unit
-# - selected_unit_index
+# Returns a dictionary describing
+# how Main should react:
+# - clear current selection
+# - select a new unit
+# - ignore the click
 # =========================
 
 func handle_unit_click(
@@ -74,11 +81,11 @@ func handle_unit_click(
 		clicked_cell
 	)
 
-	if clicked_unit == -1:
+	if clicked_unit == INVALID_UNIT:
 		return {
 			"clear_selection": true,
 			"select_unit": false,
-			"selected_unit_index": -1
+			"selected_unit_index": INVALID_UNIT
 		}
 
 	if units[clicked_unit]["team"] != turn_manager.current_team:
@@ -91,7 +98,7 @@ func handle_unit_click(
 		return {
 			"clear_selection": true,
 			"select_unit": false,
-			"selected_unit_index": -1
+			"selected_unit_index": INVALID_UNIT
 		}
 
 	return {
@@ -109,15 +116,14 @@ func handle_unit_click(
 func clear_selection() -> Dictionary:
 
 	return {
-		"selected_unit": -1,
-		"selected_unit_start_cell": Vector2i(-1, -1),
+		"selected_unit": INVALID_UNIT,
+		"selected_unit_start_cell": INVALID_CELL,
 		"move_tiles": [] as Array[Vector2i],
 
-		"pending_move_cell": Vector2i(-1, -1),
+		"pending_move_cell": INVALID_CELL,
 		"pending_move_distance": 0,
 		"pending_coverage_enemies": [] as Array[int]
 	}
-
 
 # =========================
 # Clears pending action confirmation state.
@@ -133,7 +139,7 @@ func clear_pending_action_state() -> Dictionary:
 	state["awaiting_support_confirmation"] = false
 	state["awaiting_wait_confirmation"] = false
 
-	state["pending_attack_target"] = -1
-	state["pending_support_target"] = -1
+	state["pending_attack_target"] = INVALID_UNIT
+	state["pending_support_target"] = INVALID_UNIT
 
 	return state

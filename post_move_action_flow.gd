@@ -1,6 +1,5 @@
 extends Node
 
-
 # ==================================================
 # POST MOVE ACTION FLOW
 # ==================================================
@@ -23,6 +22,12 @@ extends Node
 # - executing chosen actions
 # ==================================================
 
+# ==================================================
+# SHARED POST-MOVE CONSTANTS
+# ==================================================
+
+const INVALID_CELL := Vector2i(-1, -1)
+const INVALID_UNIT := -1
 
 # =========================
 # Returns the post-move menu
@@ -32,6 +37,11 @@ extends Node
 # Main which menu to open and
 # which pending action state to
 # store.
+#
+# Possible menu modes:
+# - confirm_wait
+# - confirm_support
+# - confirm_attack
 # =========================
 
 func get_post_move_menu_state(
@@ -47,7 +57,7 @@ func get_post_move_menu_state(
 	map_data
 ) -> Dictionary:
 
-	if selected_unit == -1:
+	if selected_unit == INVALID_UNIT:
 		return {}
 
 	if clicked_cell == pending_move_cell:
@@ -55,7 +65,7 @@ func get_post_move_menu_state(
 			"type": "wait",
 			"mode": "confirm_wait",
 			"options": ["Wait", "Cancel"],
-			"pending_facing_cell": Vector2i(-1, -1)
+			"pending_facing_cell": INVALID_CELL
 		}
 
 	if action_query.should_handle_heal_click(
@@ -82,7 +92,7 @@ func get_post_move_menu_state(
 		state["type"] = "support"
 		state["mode"] = "confirm_support"
 		state["options"] = ["Heal", "Regen", "Cancel"]
-		state["pending_facing_cell"] = Vector2i(-1, -1)
+		state["pending_facing_cell"] = INVALID_CELL
 
 		return state
 

@@ -7,10 +7,21 @@ extends Node
 # click/action phase should be handled.
 # ==================================================
 
+# ==================================================
+# SHARED ACTION QUERY CONSTANTS
+# ==================================================
+
+const INVALID_UNIT := -1
 
 # =========================
-# Returns true if this click should
-# resolve facing selection.
+# Returns true if this click
+# should resolve facing selection.
+#
+# Facing selection is ignored when:
+# - no unit is selected
+# - no movement is pending
+# - selected unit does not use facing
+# - cursor is over an attackable enemy
 # =========================
 
 func should_handle_facing_click(
@@ -26,7 +37,7 @@ func should_handle_facing_click(
 	map_data
 ) -> bool:
 
-	if selected_unit == -1:
+	if selected_unit == INVALID_UNIT:
 		return false
 
 	if not has_pending_move:
@@ -67,13 +78,14 @@ func should_handle_facing_click(
 
 	return facing_tiles.has(clicked_cell)
 
-
 # =========================
-# Returns true if clicking an empty
-# action-range tile after moving.
+# Returns true if clicking
+# an empty action-range tile
+# after moving.
 #
-# Used by archer/healer to allow
-# empty target-range clicks to prompt wait.
+# Used by archer/healer to
+# allow empty target-range
+# clicks to prompt wait.
 # =========================
 
 func is_clicking_empty_action_tile(
@@ -87,7 +99,7 @@ func is_clicking_empty_action_tile(
 	map_data
 ) -> bool:
 
-	if selected_unit == -1:
+	if selected_unit == INVALID_UNIT:
 		return false
 
 	if not has_pending_move:
@@ -96,12 +108,10 @@ func is_clicking_empty_action_tile(
 	if unit_query.get_unit_at(
 		units,
 		clicked_cell
-	) != -1:
+	) != INVALID_UNIT:
 		return false
 
 	var unit_class = units[selected_unit]["class"]
-
-	var attack_tiles: Array[Vector2i] = []
 
 	if unit_class == "healer":
 
@@ -110,17 +120,17 @@ func is_clicking_empty_action_tile(
 			map_data
 		)
 
-		attack_tiles = unit_logic.get_adjacent_choice_tiles(
+		var adjacent_attack_tiles = unit_logic.get_adjacent_choice_tiles(
 			pending_move_cell,
 			map_data
 		)
 
 		return (
 			heal_tiles.has(clicked_cell)
-			or attack_tiles.has(clicked_cell)
+			or adjacent_attack_tiles.has(clicked_cell)
 		)
 
-	attack_tiles = unit_logic.get_attack_choice_tiles(
+	var attack_tiles = unit_logic.get_attack_choice_tiles(
 		pending_move_cell,
 		unit_class,
 		map_data
@@ -128,14 +138,16 @@ func is_clicking_empty_action_tile(
 
 	return attack_tiles.has(clicked_cell)
 
-
 # =========================
-# Returns lancer facing direction
-# based on selected attack tile.
+# Returns lancer facing
+# direction based on selected
+# attack tile.
 #
-# Knight-move attack tiles automatically
-# resolve to a cardinal facing direction
-# using the dominant movement axis.
+# Knight-move attack tiles
+# automatically resolve to a
+# cardinal facing direction
+# using the dominant movement
+# axis.
 # =========================
 
 func get_lancer_facing_from_target(
@@ -156,10 +168,14 @@ func get_lancer_facing_from_target(
 		sign(diff.y)
 	)
 
-
 # =========================
-# Returns true if this click should
-# resolve attack targeting.
+# Returns true if this click
+# should resolve attack targeting.
+#
+# Requires:
+# - selected unit
+# - pending movement
+# - hovered enemy is attackable
 # =========================
 
 func should_handle_attack_click(
@@ -174,7 +190,7 @@ func should_handle_attack_click(
 	map_data
 ) -> bool:
 
-	if selected_unit == -1:
+	if selected_unit == INVALID_UNIT:
 		return false
 
 	if not has_pending_move:
@@ -191,10 +207,15 @@ func should_handle_attack_click(
 		map_data
 	)
 
-
 # =========================
-# Returns true if this click should
-# resolve healing targeting.
+# Returns true if this click
+# should resolve healing
+# targeting.
+#
+# Requires:
+# - selected healer
+# - pending movement
+# - hovered ally is healable
 # =========================
 
 func should_handle_heal_click(
@@ -209,7 +230,7 @@ func should_handle_heal_click(
 	map_data
 ) -> bool:
 
-	if selected_unit == -1:
+	if selected_unit == INVALID_UNIT:
 		return false
 
 	if not has_pending_move:
@@ -229,10 +250,14 @@ func should_handle_heal_click(
 		map_data
 	)
 
-
 # =========================
-# Returns true if this click should
-# resolve movement selection.
+# Returns true if this click
+# should resolve movement
+# selection.
+#
+# Requires:
+# - selected unit
+# - clicked tile is reachable
 # =========================
 
 func should_handle_move_click(
@@ -241,7 +266,7 @@ func should_handle_move_click(
 	clicked_cell: Vector2i
 ) -> bool:
 
-	if selected_unit == -1:
+	if selected_unit == INVALID_UNIT:
 		return false
 
 	return move_tiles.has(clicked_cell)

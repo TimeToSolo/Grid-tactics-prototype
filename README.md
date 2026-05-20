@@ -2,7 +2,7 @@
 
 Turn-based tactical combat prototype built in Godot using GDScript.
 
-This project explores tactical combat centered around movement, facing, stamina, directional coverage, territorial control, battlefield pressure, terrain-aware navigation, formation-based engagements, readable AI behavior, sequential battlefield presentation, and data-driven mission scripting.
+This project explores tactical combat centered around movement, facing, stamina, directional coverage, territorial control, battlefield pressure, terrain-aware navigation, formation-based engagements, readable AI behavior, sequential battlefield presentation, layered mission scripting, and editor-driven campaign design.
 
 The goal is to create battles where:
 - positioning matters before attacks happen
@@ -13,6 +13,7 @@ The goal is to create battles where:
 - AI behaves consistently within terrain constraints
 - enemy actions remain readable and visually understandable
 - missions evolve dynamically through staged objectives and reinforcements
+- campaign encounters support cinematic pacing and retreat gameplay
 
 Rather than focusing on raw stat trading, the prototype emphasizes:
 - formation integrity
@@ -25,6 +26,8 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - navigable battlefield control
 - sequential combat readability
 - dynamic mission flow
+- pressure-based positioning
+- campaign-style encounter structure
 
 ---
 
@@ -50,6 +53,11 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Delayed enemy action pacing
 - Attack timing synced with visible HP updates
 - Enemy-turn input locking
+- Real-time movement/facing/action preview flow
+- Unified pending-action architecture
+- Consistent invalid-state handling across gameplay systems
+
+---
 
 ## Movement and Pathing
 
@@ -72,6 +80,10 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Hidden facing during movement animations
 - Future-path directional facing
 - AI facing based on continued navigable routes
+- Path-based interception detection
+- Real reachable-route evaluation for AI decisions
+
+---
 
 ## Unit Types
 
@@ -81,6 +93,8 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Lancer
 - Archer
 - Healer
+
+---
 
 ## Tactical Systems
 
@@ -96,7 +110,7 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Chokepoint gameplay
 - Fallback-line gameplay
 - Coverage-based positional control
-- Territorial AI leash systems
+- Territorial AI leash
 - Home-position defensive behavior
 - Path-based interception detection
 - Terrain-driven engagement flow
@@ -104,11 +118,25 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Stamina-driven battlefield pacing
 - Direction-aware enemy presentation
 - Sequential battlefield readability systems
+- Real-time movement/facing/action preview flow
+- Unified pending-action architecture
+- Consistent invalid-state handling across gameplay systems
 - Data-driven layered mission objectives
 - Multi-stage mission flow
 - Dynamic reinforcement spawning
 - Objective-event resolution system
 - Campaign mission architecture
+- Modular gameplay system architecture
+- Decoupled gameplay/query/render systems
+- Shared action-confirmation pipeline
+- Delayed movement finalization architecture
+- Coverage resolution after confirmed actions
+- Future-facing directional prediction systems
+- Terrain-aware AI route evaluation
+- Reachable-route tactical evaluation
+- Deterministic pathfinding behavior
+- Unified stamina preview architecture
+- Pending-action state management system
 
 ## AI Systems
 
@@ -128,6 +156,12 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - AI action-result reporting architecture
 - Decoupled AI logic and presentation layer
 - Future-path facing evaluation
+- Actual traversable-route evaluation
+- Invalid-state AI movement protection
+- Shared AI movement finalization system
+- Terrain-aware healer positioning
+- Defensive leash-return behavior
+- Path-based directional facing prediction
 
 ### Current AI Profiles
 
@@ -140,6 +174,8 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Respects terrain/pathing restrictions
 - Uses actual navigable routes
 - Faces toward future navigable movement routes
+- Uses terrain-aware route evaluation
+- Uses post-move attack reevaluation
 
 #### Defender
 
@@ -151,6 +187,8 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Never chases endlessly across the map
 - Uses terrain-aware movement evaluation
 - Faces toward future navigable movement routes while advancing
+- Uses persistent leash/home serialization
+- Uses terrain-aware return-home evaluation
 
 #### Cautious Ranged
 
@@ -161,6 +199,8 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Repositions before attacking when possible
 - Uses actual traversable routes for movement evaluation
 - Does not rely on directional coverage facing
+- Evaluates retreat positioning dynamically
+- Uses movement-aware ranged positioning
 
 #### Support Healer
 
@@ -170,6 +210,8 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Uses terrain-aware navigation
 - Avoids unnecessary frontline exposure
 - Falls back to movement behavior when no healing target exists
+- Uses terrain-aware healer approach logic
+- Supports heal and regeneration actions
 
 ## Campaign and Mission Systems
 
@@ -187,6 +229,10 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Modular mission-result evaluation
 - Serialized mission objective data
 - Mission scripting foundation
+- Objective-zone serialization
+- Editor-driven mission authoring
+- Layered objective editing workflow
+- Dynamic mission-event architecture
 
 ## Editor Features
 
@@ -219,7 +265,14 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Objective parameter editing
 - Objective completion-event editing
 - Persistent objective serialization
+- Objective-zone editing
+- Objective-zone visualization overlays
+- Reinforcement-stage visualization
+- Editor-side objective data generation
 - Rapid tutorial-map prototyping workflow
+- Shared editor-state architecture
+- Modular editor rendering systems
+- Editor-specific input controller architecture
 
 ## UI Features
 
@@ -255,8 +308,11 @@ Rather than focusing on raw stat trading, the prototype emphasizes:
 - Reinforcement spawn presentation
 - Objective editor UI
 - Mission-stage inspection UI
+- Real-time stamina preview display
+- Pending-action confirmation previews
+- Unified action-confirmation menu flow
 
----
+----
 
 # Design Goals
 
@@ -277,8 +333,41 @@ This prototype is focused on creating tactical battles where:
 - enemy actions remain visually understandable
 - mission objectives evolve dynamically during battle
 - tactical encounters support cinematic campaign flow
+- terrain and pathing create naturally evolving battle lines
+- battlefield readability remains clear even during large engagements
+- AI decisions feel understandable rather than random
+- pressure and positioning matter more than burst damage
+- movement routes matter as much as destinations
+- defensive territory creates meaningful strategic identity
+- retreat gameplay feels tense rather than scripted
+- battle pacing supports campaign storytelling
+- objective flow creates evolving tactical scenarios
+- enemy reinforcements create shifting battlefield states
+- unit roles emerge naturally through positioning and terrain
+- tactical information remains readable at a glance
+- campaign encounters feel handcrafted rather than procedural
+- tactical systems remain modular and expandable during development
 
-The combat system draws inspiration from tactical RPGs and strategy games, but replaces unlimited counterattacks with stamina-limited directional coverage and reaction systems.
+The combat system draws inspiration from tactical RPGs and strategy games, but replaces unlimited counterattacks with:
+- stamina-limited directional coverage
+- delayed movement confirmation
+- path-based interception systems
+- terrain-aware movement pressure
+- future-facing battlefield control
+- movement-driven vulnerability
+- readable enemy threat presentation
+
+Rather than emphasizing raw stat optimization, the project focuses on:
+- battlefield control
+- tactical positioning
+- formation cohesion
+- territorial pressure
+- navigable terrain flow
+- readable tactical information
+- layered objective progression
+- campaign-style encounter pacing
+- meaningful retreat and fallback gameplay
+- movement commitment and risk evaluation
 
 The long-term goal is to create battles that feel:
 - readable
@@ -289,5 +378,19 @@ The long-term goal is to create battles that feel:
 - formation-focused
 - visually understandable
 - campaign-driven
+- sequentially readable
+- strategically navigable
+- mechanically coherent
+- movement-focused
+- dynamically evolving
+- tension-oriented
+- cinematic without sacrificing clarity
 
-rather than purely statistical.
+rather than:
+- purely statistical
+- animation-chaotic
+- damage-race focused
+- solved by raw unit trading
+- dependent on hidden AI behavior
+- dominated by unavoidable counterattacks
+- reliant on excessive randomness

@@ -17,6 +17,10 @@ func save_map(
 		"height": map_data.grid_height,
 		"terrain_map": map_data.terrain_map,
 		"objective": objective_data,
+		"objective_zones": objective_data.get(
+			"objective_zones",
+			{}
+		),
 		"units": []
 	}
 
@@ -144,6 +148,10 @@ func load_map(
 	print("Loaded map from: ", file_path)
 
 	if data.has("objective"):
+		if data.has("objective_zones"):
+			data["objective"]["objective_zones"] = (
+				data["objective_zones"]
+			)
 		return data["objective"]
 
 	return {}

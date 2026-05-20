@@ -22,9 +22,15 @@ var objective_data := {}
 # objective type.
 # =========================
 
-func setup_objective(data: Dictionary):
+var objective_zones := {}
+
+func setup_objective(
+	data: Dictionary,
+	zones: Dictionary = {}
+):
 
 	objective_data = data
+	objective_zones = zones
 	active_objective_type = data.get("type", "rout")
 	objective_stage = 0
 	enemies_defeated = 0
@@ -46,18 +52,14 @@ func record_enemy_defeated():
 # =========================
 
 func get_mission_result(
-	units: Array,
-	player_start_area: Array[Vector2i]
+	units: Array
 ) -> String:
 
 	if not player_units_exist(units):
 		return "defeat"
 
 	if active_objective_type == "layered":
-		return get_layered_objective_result(
-			units,
-			player_start_area
-		)
+		return get_layered_objective_result(units)
 
 	if active_objective_type == "rout":
 		return get_rout_result(units)
@@ -81,10 +83,7 @@ func get_rout_result(units: Array) -> String:
 # result for current stage.
 # =========================
 
-func get_layered_objective_result(
-	units: Array,
-	player_start_area: Array[Vector2i]
-) -> String:
+func get_layered_objective_result(units: Array) -> String:
 
 	var stages = objective_data.get("stages", [])
 
@@ -111,11 +110,32 @@ func get_layered_objective_result(
 					""
 				)
 
+		"rout":
+
+			if not enemy_units_exist(units):
+
+				objective_stage += 1
+
+				return stage.get(
+					"on_complete",
+					""
+				)
+
 		"retreat":
+
+			var zone_name = stage.get(
+				"zone",
+				"retreat_zone"
+			)
+
+			var target_area = objective_zones.get(
+				zone_name,
+				[]
+			)
 
 			if all_player_units_in_area(
 				units,
-				player_start_area
+				target_area
 			):
 
 				objective_stage += 1
@@ -186,3 +206,12 @@ func all_player_units_in_area(
 func get_objective_stage() -> int:
 
 	return objective_stage
+
+# =========================
+# Returns current enemy
+# defeat count.
+# =========================
+
+func get_enemies_defeated() -> int:
+
+	return enemies_defeated

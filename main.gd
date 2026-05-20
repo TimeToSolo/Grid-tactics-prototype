@@ -238,6 +238,12 @@ var editor_unit_move_start_cell: Vector2i = Vector2i(-1, -1)
 
 var show_all_defender_leashes := false
 
+var objective_zones := {
+	"retreat_zone": []
+}
+
+var selected_objective_zone := "retreat_zone"
+
 var editor_ai_profiles_by_class = {
 
 	"fighter": [
@@ -400,6 +406,12 @@ func load_editor_map():
 		get_editor_map_path()
 	)
 
+	if current_objective_data.has("objective_zones"):
+
+		deserialize_objective_zones(
+			current_objective_data["objective_zones"]
+		)
+
 	queue_redraw()
 
 # =========================
@@ -431,6 +443,12 @@ func load_campaign_level():
 		unit_data,
 		mission_flow_controller.get_campaign_level_path()
 	)
+
+	if current_objective_data.has("objective_zones"):
+
+		deserialize_objective_zones(
+			current_objective_data["objective_zones"]
+		)
 
 	queue_redraw()
 
@@ -589,7 +607,7 @@ var editor_objective_stages := [
 	},
 	{
 		"type": "retreat",
-		"zone": "player_start_area",
+		"zone": "retreat_zone",
 		"on_complete": "victory"
 	}
 ]
@@ -837,6 +855,16 @@ func draw_editor_ui():
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(x + 420, palette_y),
+		"Zone",
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		font_size,
+		Color.CYAN if editor_palette == "zone" else Color.WHITE
+	)
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(x + 520, palette_y),
 		"Select",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
@@ -1129,6 +1157,8 @@ func cycle_editor_palette():
 	elif editor_palette == "enemy_unit":
 		editor_palette = "reinforcement"
 	elif editor_palette == "reinforcement":
+		editor_palette = "zone"
+	elif editor_palette == "zone":
 		editor_palette = "select"
 	else:
 		editor_palette = "terrain"
@@ -1241,6 +1271,8 @@ func _draw():
 		has_pending_move()
 	)
 
+	draw_active_objective_zones()
+	draw_current_objective_text()
 	draw_cursor_preview()
 
 	if not action_menu_controller.is_open():
@@ -1357,6 +1389,7 @@ func _draw():
 	draw_editor_unit_move_preview()
 	draw_editor_reinforcement_markers()
 	draw_editor_move_preview()
+	draw_editor_objective_zones()
 	draw_editor_ui()
 	draw_editor_resize_ui()
 
@@ -1496,6 +1529,208 @@ func draw_editor_reinforcement_markers():
 			16,
 			Color(0.15, 0.15, 0.15)
 		)
+
+# =========================
+# Draws objective zone tiles
+# while editing maps.
+# =========================
+
+func draw_editor_objective_zones():
+
+	if not editor_mode:
+		return
+
+	for zone_name in objective_zones.keys():
+
+		for cell in objective_zones[zone_name]:
+
+			if not map_data.is_inside_grid(cell):
+				continue
+
+			draw_rect(
+				map_data.grid_rect(cell),
+				Color(0.0, 0.8, 1.0, 0.25)
+			)
+
+			draw_rect(
+				map_data.grid_rect(cell),
+				Color(0.0, 0.8, 1.0, 0.8),
+				false,
+				3
+			)
+
+# =========================
+# Returns zone name used by
+# the active objective stage.
+# =========================
+
+func get_active_objective_zone_name() -> String:
+
+	var stages = current_objective_data.get("stages", [])
+
+	var stage_index = mission_objectives.get_objective_stage()
+
+	if stage_index < 0 or stage_index >= stages.size():
+		return ""
+
+	var stage = stages[stage_index]
+
+	if not stage.has("zone"):
+		return ""
+
+	return stage["zone"]
+
+# =========================
+# Draws active objective zone
+# tiles during battle.
+# =========================
+
+func draw_active_objective_zones():
+
+	if editor_mode:
+		return
+
+	var zone_name = get_active_objective_zone_name()
+
+	if zone_name == "":
+		return
+
+	var zone_tiles = objective_zones.get(
+		zone_name,
+		[]
+	)
+
+	for cell in zone_tiles:
+
+		if not map_data.is_inside_grid(cell):
+			continue
+
+		draw_rect(
+			map_data.grid_rect(cell),
+			Color(0.0, 0.8, 1.0, 0.18)
+		)
+
+		draw_rect(
+			map_data.grid_rect(cell),
+			Color(0.0, 0.8, 1.0, 0.65),
+			false,
+			3
+		)
+
+# =========================
+# Returns display text for
+# the current objective stage.
+# =========================
+
+func get_current_objective_text() -> String:
+
+	var stages = current_objective_data.get("stages", [])
+
+	var stage_index = mission_objectives.get_objective_stage()
+
+	if stage_index < 0 or stage_index >= stages.size():
+		return ""
+
+	var stage = stages[stage_index]
+
+	match stage.get("type", ""):
+
+		"defeat_enemy_count":
+
+			var required_count = stage.get("required_count", 1)
+			var current_count = mission_objectives.get_enemies_defeated()
+
+			return (
+				"Defeat enemies: "
+				+ str(current_count)
+				+ "/"
+				+ str(required_count)
+			)
+
+		"retreat":
+			return "Retreat to the marked zone"
+
+		"rout":
+			return "Defeat all enemies"
+
+	return ""
+
+# =========================
+# Draws current objective
+# text during battle.
+# =========================
+
+func draw_current_objective_text():
+
+	if editor_mode:
+		return
+
+	var objective_text = get_current_objective_text()
+
+	if objective_text == "":
+		return
+
+	draw_rect(
+		Rect2(12, 58, 360, 48),
+		Color(0.0, 0.0, 0.0, 0.65)
+	)
+
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(24, 88),
+		"OBJECTIVE: " + objective_text,
+		HORIZONTAL_ALIGNMENT_LEFT,
+		-1,
+		16,
+		Color.WHITE
+	)
+
+# =========================
+# Shows objective update
+# feedback after stage change.
+# =========================
+
+func show_objective_updated_popup():
+
+	var objective_text = get_current_objective_text()
+
+	if objective_text == "":
+		return
+
+	await show_phase_popup(
+		"Objective Updated: " + objective_text
+	)
+
+# =========================
+# Adds a tile to the selected
+# objective zone.
+# =========================
+
+func add_cell_to_selected_objective_zone(cell: Vector2i):
+
+	if not objective_zones.has(selected_objective_zone):
+		objective_zones[selected_objective_zone] = []
+
+	if objective_zones[selected_objective_zone].has(cell):
+		return
+
+	objective_zones[selected_objective_zone].append(cell)
+
+	queue_redraw()
+
+# =========================
+# Removes a tile from the
+# selected objective zone.
+# =========================
+
+func remove_cell_from_selected_objective_zone(cell: Vector2i):
+
+	if not objective_zones.has(selected_objective_zone):
+		return
+
+	objective_zones[selected_objective_zone].erase(cell)
+
+	queue_redraw()
 
 # =========================
 # Draws leash range preview
@@ -1972,6 +2207,12 @@ func load_current_campaign_mission():
 		mission_flow_controller.get_campaign_level_path()
 	)
 
+	if current_objective_data.has("objective_zones"):
+
+		deserialize_objective_zones(
+			current_objective_data["objective_zones"]
+		)
+
 	setup_current_mission_objective()
 	await start_battle_flow()
 
@@ -2028,7 +2269,8 @@ func setup_current_mission_objective():
 		}
 
 	mission_objectives.setup_objective(
-		current_objective_data
+		current_objective_data,
+		objective_zones
 	)
 
 	if objective_uses_player_start_area():
@@ -2043,8 +2285,54 @@ func update_current_objective_from_editor():
 
 	current_objective_data = {
 		"type": "layered",
-		"stages": editor_objective_stages
+		"stages": editor_objective_stages,
+		"objective_zones": serialize_objective_zones()
 	}
+
+# =========================
+# Converts objective zones
+# into JSON-safe data.
+# =========================
+
+func serialize_objective_zones() -> Dictionary:
+
+	var serialized = {}
+
+	for zone_name in objective_zones.keys():
+
+		serialized[zone_name] = []
+
+		for cell in objective_zones[zone_name]:
+
+			serialized[zone_name].append({
+				"x": cell.x,
+				"y": cell.y
+			})
+
+	return serialized
+
+# =========================
+# Loads serialized objective
+# zone data into runtime
+# Vector2i arrays.
+# =========================
+
+func deserialize_objective_zones(data: Dictionary):
+
+	objective_zones.clear()
+
+	for zone_name in data.keys():
+
+		objective_zones[zone_name] = []
+
+		for entry in data[zone_name]:
+
+			objective_zones[zone_name].append(
+				Vector2i(
+					entry["x"],
+					entry["y"]
+				)
+			)
 
 # =========================
 # Adds a new objective stage
@@ -2161,7 +2449,7 @@ func get_default_objective_stage(stage_type: String) -> Dictionary:
 		"retreat":
 			return {
 				"type": "retreat",
-				"zone": "player_start_area",
+				"zone": "retreat_zone",
 				"on_complete": "victory"
 			}
 
@@ -2253,13 +2541,15 @@ func resolve_objective_event(event_name: String):
 	match event_name:
 
 		"advance_stage":
-			return
+			await show_objective_updated_popup()
 
 		"spawn_reinforcements":
 			pending_reinforcement_spawn = true
 			pending_reinforcement_stage = (
 				mission_objectives.get_objective_stage()
 			)
+
+			await show_objective_updated_popup()
 
 		"victory":
 			await handle_mission_victory()
@@ -2971,6 +3261,12 @@ func handle_mouse_input(event):
 				queue_redraw()
 				return
 
+			if editor_palette == "zone":
+
+				remove_cell_from_selected_objective_zone(hovered_cell)
+				queue_redraw()
+				return
+
 			if editor_palette == "terrain":
 
 				editor_system.paint_tile(
@@ -3172,6 +3468,10 @@ func handle_left_click():
 				clicked_cell,
 				selected_editor_tile
 			)
+
+		elif editor_palette == "zone":
+
+			add_cell_to_selected_objective_zone(clicked_cell)
 
 		elif editor_palette == "player_unit":
 
@@ -3637,10 +3937,7 @@ func check_mission_end_conditions():
 	if mission_flow_controller.get_mission_state() != "battle":
 		return
 
-	var mission_result = (
-		mission_objectives
-		.get_mission_result(units, player_start_area)
-	)
+	var mission_result = mission_objectives.get_mission_result(units)
 
 	if mission_result == "":
 		return

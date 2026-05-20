@@ -112,6 +112,7 @@ func place_unit(
 	)
 
 	if ai_profile == "defender":
+		unit["home_pos"] = cell
 		unit["leash_range"] = 3
 
 	units.append(unit)
@@ -273,7 +274,8 @@ func move_selection(
 
 		unit["pos"] += offset
 
-		unit["home_pos"] += offset
+		if unit.has("home_pos"):
+			unit["home_pos"] += offset
 
 		units.append(unit)
 
@@ -296,6 +298,9 @@ func increase_unit_leash_range(
 		return
 
 	if unit_index >= units.size():
+		return
+
+	if not units[unit_index].has("leash_range"):
 		return
 
 	units[unit_index]["leash_range"] += 1
@@ -324,7 +329,181 @@ func decrease_unit_leash_range(
 	if unit_index >= units.size():
 		return
 
+	if not units[unit_index].has("leash_range"):
+		return
+
 	units[unit_index]["leash_range"] = max(
 		0,
 		units[unit_index]["leash_range"] - 1
 	)
+
+# =========================
+# Returns current editor map path.
+# =========================
+
+func get_editor_map_path(editor_state) -> String:
+
+	return (
+	"user://maps/map_"
+	+ str(editor_state.editor_map_slot)
+	+ ".json"
+)
+
+# =========================
+# Changes active editor map slot.
+# =========================
+
+func change_editor_map_slot(
+	editor_state,
+	direction: int
+):
+
+	editor_state.editor_map_slot += direction
+
+	if editor_state.editor_map_slot < 1:
+		editor_state.editor_map_slot = editor_state.MAX_EDITOR_MAP_SLOTS
+
+	if editor_state.editor_map_slot > editor_state.MAX_EDITOR_MAP_SLOTS:
+		editor_state.editor_map_slot = 1
+
+# =========================
+# Returns true if a cell is
+# inside the current selected
+# editor rectangle area.
+#
+# Used for selection movement
+# and drag detection.
+# =========================
+
+func editor_cell_is_inside_selected_area(
+	editor_state,
+	cell: Vector2i
+) -> bool:
+
+	if editor_state.editor_selected_rect_start == Vector2i(-1, -1):
+		return false
+
+	if editor_state.editor_selected_rect_end == Vector2i(-1, -1):
+		return false
+
+	return (
+		cell.x >= editor_state.editor_selected_rect_start.x
+		and cell.x <= editor_state.editor_selected_rect_end.x
+		and cell.y >= editor_state.editor_selected_rect_start.y
+		and cell.y <= editor_state.editor_selected_rect_end.y
+	)
+
+# =========================
+# Rotates editor unit facing
+# clockwise through 8 directions.
+# =========================
+
+func rotate_editor_facing(editor_state):
+
+	var directions = [
+		Vector2i(0, -1),   # N
+		Vector2i(1, -1),   # NE
+		Vector2i(1, 0),    # E
+		Vector2i(1, 1),    # SE
+		Vector2i(0, 1),    # S
+		Vector2i(-1, 1),   # SW
+		Vector2i(-1, 0),   # W
+		Vector2i(-1, -1)   # NW
+	]
+
+	var current_index = directions.find(
+		editor_state.selected_editor_facing
+	)
+
+	if current_index == -1:
+		editor_state.selected_editor_facing = Vector2i(0, -1)
+		return
+
+	var next_index = (current_index + 1) % directions.size()
+
+	editor_state.selected_editor_facing = directions[next_index]
+
+# =========================
+# Cycles editor palette mode.
+# =========================
+
+func cycle_editor_palette(editor_state):
+
+	if not editor_state.editor_mode:
+		return
+
+	if editor_state.editor_palette == "terrain":
+		editor_state.editor_palette = "player_unit"
+	elif editor_state.editor_palette == "player_unit":
+		editor_state.editor_palette = "enemy_unit"
+	elif editor_state.editor_palette == "enemy_unit":
+		editor_state.editor_palette = "reinforcement"
+	elif editor_state.editor_palette == "reinforcement":
+		editor_state.editor_palette = "zone"
+	elif editor_state.editor_palette == "zone":
+		editor_state.editor_palette = "select"
+	else:
+		editor_state.editor_palette = "terrain"
+
+# =========================
+# Cycles the AI profile used
+# when placing units in editor mode.
+#
+# Only AI profiles valid for the
+# selected unit class are available.
+# =========================
+
+func cycle_editor_ai_profile(editor_state):
+
+	var valid_profiles = get_valid_editor_ai_profiles(
+		editor_state
+	)
+
+	var current_index = valid_profiles.find(
+		editor_state.selected_editor_ai_profile
+	)
+
+	if current_index == -1:
+
+		editor_state.selected_editor_ai_profile = valid_profiles[0]
+		return
+
+	var next_index = (
+		current_index + 1
+	) % valid_profiles.size()
+
+	editor_state.selected_editor_ai_profile = valid_profiles[next_index]
+
+# =========================
+# Returns valid AI profiles for
+# the currently selected unit class.
+# =========================
+
+func get_valid_editor_ai_profiles(editor_state) -> Array:
+
+	if editor_state.editor_ai_profiles_by_class.has(
+		editor_state.selected_editor_unit_class
+	):
+		return editor_state.editor_ai_profiles_by_class[
+			editor_state.selected_editor_unit_class
+		]
+
+	return ["barbarian"]
+
+# =========================
+# Ensures selected AI profile
+# is valid for the selected class.
+# =========================
+
+func validate_selected_editor_ai_profile(editor_state):
+
+	var valid_profiles = get_valid_editor_ai_profiles(
+		editor_state
+	)
+
+	if valid_profiles.has(
+		editor_state.selected_editor_ai_profile
+	):
+		return
+
+	editor_state.selected_editor_ai_profile = valid_profiles[0]

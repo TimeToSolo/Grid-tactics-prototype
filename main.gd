@@ -71,6 +71,9 @@ extends Node2D
 @onready var hover_unit_panel_controller = $Systems/HoverUnitPanelController
 @onready var post_move_action_flow = $Systems/PostMoveActionFlow
 
+@onready var editor_state = $Systems/EditorState
+@onready var editor_render_system = $Systems/EditorRenderSystem
+
 # =========================
 # UI
 # =========================
@@ -167,218 +170,19 @@ var pending_facing_cell: Vector2i = Vector2i(-1, -1)
 var input_locked := false
 
 # ==================================================
-# LEVEL EDITOR STATE
+# OBJECTIVE / MISSION STATE
 # ==================================================
 
-# True while level editor mode is active.
-var editor_mode := false
+var current_objective_data := {}
 
-# Currently selected terrain tile symbol
-# used for painting terrain.
-var selected_editor_tile := "."
+# True when reinforcements
+# should spawn after the
+# current enemy phase ends.
+var pending_reinforcement_spawn := false
 
-# True while dragging a rectangle fill area.
-var editor_rect_dragging := false
+var pending_reinforcement_stage := -1
 
-# Starting cell for Ctrl + left-click rectangle fill.
-var editor_rect_start_cell: Vector2i = Vector2i(-1, -1)
-
-# Current editor placement mode.
-# "terrain", "player_unit", or "enemy_unit".
-var editor_palette := "terrain"
-
-# Currently selected unit class for editor placement.
-var selected_editor_unit_class := "fighter"
-
-# Starting facing direction for newly placed editor units.
-var selected_editor_facing: Vector2i = Vector2i(0, -1)
-
-# True while the editor resize prompt is active.
-var editor_resize_mode := false
-
-# Preview width before confirming resize.
-var editor_resize_width := 20
-
-# Preview height before confirming resize.
-var editor_resize_height := 16
-
-# True while dragging a selection rectangle.
-var editor_select_dragging := false
-
-# Start cell for editor selection rectangle.
-var editor_select_start_cell: Vector2i = Vector2i(-1, -1)
-
-# Selected rectangle start.
-var editor_selected_rect_start: Vector2i = Vector2i(-1, -1)
-
-# Selected rectangle end.
-var editor_selected_rect_end: Vector2i = Vector2i(-1, -1)
-
-# True while dragging a selected editor area.
-var editor_move_dragging := false
-
-# Cell where selected-area move drag began.
-var editor_move_start_cell: Vector2i = Vector2i(-1, -1)
-
-# Current save/load map slot.
-var editor_map_slot := 1
-
-# Total available quick-save slots.
-const MAX_EDITOR_MAP_SLOTS = 9
-
-# AI profile assigned to newly placed editor units.
-var selected_editor_ai_profile := "barbarian"
-
-var selected_editor_unit := -1
-
-var editor_reinforcement_stage := 1
-
-var editor_unit_move_dragging := false
-var editor_unit_move_start_cell: Vector2i = Vector2i(-1, -1)
-
-var show_all_defender_leashes := false
-
-var objective_zones := {
-	"retreat_zone": []
-}
-
-var selected_objective_zone := "retreat_zone"
-
-var editor_ai_profiles_by_class = {
-
-	"fighter": [
-		"barbarian",
-		"defender"
-	],
-
-	"tank": [
-		"barbarian",
-		"defender"
-	],
-
-	"lancer": [
-		"barbarian",
-		"defender"
-	],
-
-	"duelist": [
-		"barbarian",
-		"defender"
-	],
-
-	"archer": [
-		"cautious_ranged"
-	],
-
-	"healer": [
-		"support_healer"
-	]
-}
-
-# =========================
-# Cycles the AI profile used
-# when placing units in editor mode.
-#
-# Only AI profiles valid for the
-# selected unit class are available.
-# =========================
-
-func cycle_editor_ai_profile():
-
-	var valid_profiles = get_valid_editor_ai_profiles()
-
-	var current_index = valid_profiles.find(
-		selected_editor_ai_profile
-	)
-
-	if current_index == -1:
-
-		selected_editor_ai_profile = valid_profiles[0]
-		queue_redraw()
-		return
-
-	var next_index = (
-		current_index + 1
-	) % valid_profiles.size()
-
-	selected_editor_ai_profile = valid_profiles[next_index]
-
-	queue_redraw()
-
-# =========================
-# Returns valid AI profiles for
-# the currently selected unit class.
-# =========================
-
-func get_valid_editor_ai_profiles() -> Array:
-
-	if editor_ai_profiles_by_class.has(selected_editor_unit_class):
-		return editor_ai_profiles_by_class[selected_editor_unit_class]
-
-	return ["barbarian"]
-
-
-# =========================
-# Ensures selected AI profile
-# is valid for the selected class.
-# =========================
-
-func validate_selected_editor_ai_profile():
-
-	var valid_profiles = get_valid_editor_ai_profiles()
-
-	if valid_profiles.has(selected_editor_ai_profile):
-		return
-
-	selected_editor_ai_profile = valid_profiles[0]
-
-# =========================
-# Returns current editor map path.
-# =========================
-
-func get_editor_map_path() -> String:
-
-	return "user://maps/map_" + str(editor_map_slot) + ".json"
-
-# =========================
-# Changes active editor map slot.
-# =========================
-
-func change_editor_map_slot(direction: int):
-
-	editor_map_slot += direction
-
-	if editor_map_slot < 1:
-		editor_map_slot = MAX_EDITOR_MAP_SLOTS
-
-	if editor_map_slot > MAX_EDITOR_MAP_SLOTS:
-		editor_map_slot = 1
-
-	queue_redraw()
-
-# =========================
-# Returns true if a cell is
-# inside the current selected
-# editor rectangle area.
-#
-# Used for selection movement
-# and drag detection.
-# =========================
-
-func editor_cell_is_inside_selected_area(cell: Vector2i) -> bool:
-
-	if editor_selected_rect_start == Vector2i(-1, -1):
-		return false
-
-	if editor_selected_rect_end == Vector2i(-1, -1):
-		return false
-
-	return (
-		cell.x >= editor_selected_rect_start.x
-		and cell.x <= editor_selected_rect_end.x
-		and cell.y >= editor_selected_rect_start.y
-		and cell.y <= editor_selected_rect_end.y
-	)
+var staged_reinforcements: Array = []
 
 # =========================
 # Saves editor map.
@@ -389,7 +193,7 @@ func save_editor_map():
 	map_serializer.save_map(
 		map_data,
 		units,
-		get_editor_map_path(),
+		editor_system.get_editor_map_path(editor_state),
 		current_objective_data
 	)
 
@@ -403,7 +207,7 @@ func load_editor_map():
 		map_data,
 		units,
 		unit_data,
-		get_editor_map_path()
+		editor_system.get_editor_map_path(editor_state)
 	)
 
 	if current_objective_data.has("objective_zones"):
@@ -461,27 +265,27 @@ func handle_editor_resize_input(event):
 	match event.keycode:
 
 		KEY_RIGHT:
-			editor_resize_width += 1
+			editor_state.editor_resize_width += 1
 
 		KEY_LEFT:
-			editor_resize_width = max(1, editor_resize_width - 1)
+			editor_state.editor_resize_width = max(1, editor_state.editor_resize_width - 1)
 
 		KEY_UP:
-			editor_resize_height += 1
+			editor_state.editor_resize_height += 1
 
 		KEY_DOWN:
-			editor_resize_height = max(1, editor_resize_height - 1)
+			editor_state.editor_resize_height = max(1, editor_state.editor_resize_height - 1)
 
 		KEY_ENTER:
 			map_data.resize_map(
-				editor_resize_width,
-				editor_resize_height
+				editor_state.editor_resize_width,
+				editor_state.editor_resize_height
 			)
 
-			editor_resize_mode = false
+			editor_state.editor_resize_mode = false
 
 		KEY_ESCAPE:
-			editor_resize_mode = false
+			editor_state.editor_resize_mode = false
 
 	queue_redraw()
 	
@@ -491,7 +295,7 @@ func handle_editor_resize_input(event):
 
 func draw_editor_resize_ui():
 
-	if not editor_resize_mode:
+	if not editor_state.editor_resize_mode:
 		return
 
 	draw_rect(
@@ -512,7 +316,7 @@ func draw_editor_resize_ui():
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(24, 180),
-		"Width: " + str(editor_resize_width) + "   Left/Right",
+		"Width: " + str(editor_state.editor_resize_width) + "   Left/Right",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
 		16,
@@ -522,7 +326,7 @@ func draw_editor_resize_ui():
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(24, 205),
-		"Height: " + str(editor_resize_height) + "   Up/Down",
+		"Height: " + str(editor_state.editor_resize_height) + "   Up/Down",
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
 		16,
@@ -545,12 +349,12 @@ func draw_editor_resize_ui():
 
 func start_editor_resize_mode():
 
-	if not editor_mode:
+	if not editor_state.editor_mode:
 		return
 
-	editor_resize_mode = true
-	editor_resize_width = map_data.grid_width
-	editor_resize_height = map_data.grid_height
+	editor_state.editor_resize_mode = true
+	editor_state.editor_resize_width = map_data.grid_width
+	editor_state.editor_resize_height = map_data.grid_height
 
 	queue_redraw()
 
@@ -592,613 +396,6 @@ var turn_number = 1
 # Player extraction area for
 # retreat-style objectives.
 var player_start_area: Array[Vector2i] = []
-
-var current_objective_data := {}
-var editor_objective_type := "retreat"
-var editor_required_enemy_defeats := -1
-
-var editor_objective_stage_index := 0
-
-var editor_objective_stages := [
-	{
-		"type": "defeat_enemy_count",
-		"required_count": 3,
-		"on_complete": "spawn_reinforcements"
-	},
-	{
-		"type": "retreat",
-		"zone": "retreat_zone",
-		"on_complete": "victory"
-	}
-]
-
-var editor_objective_stage_types := [
-	"defeat_enemy_count",
-	"rout",
-	"retreat"
-]
-
-# True when reinforcements
-# should spawn after the
-# current enemy phase ends.
-var pending_reinforcement_spawn := false
-
-var pending_reinforcement_stage := -1
-
-var staged_reinforcements: Array = []
-
-# =========================
-# Draws destination preview
-# while moving selected area.
-# =========================
-
-func draw_editor_move_preview():
-
-	if not editor_mode:
-		return
-
-	if editor_palette != "select":
-		return
-
-	if not editor_move_dragging:
-		return
-
-	var offset = hovered_cell - editor_move_start_cell
-
-	var preview_start = editor_selected_rect_start + offset
-	var preview_end = editor_selected_rect_end + offset
-
-	for y in range(preview_start.y, preview_end.y + 1):
-		for x in range(preview_start.x, preview_end.x + 1):
-
-			var cell = Vector2i(x, y)
-
-			if not map_data.is_inside_grid(cell):
-				continue
-
-			draw_rect(
-				map_data.grid_rect(cell),
-				Color(0.0, 1.0, 1.0, 0.35)
-			)
-
-# =========================
-# Draws selected editor area.
-# =========================
-
-func draw_editor_selected_area():
-
-	if not editor_mode:
-		return
-
-	if editor_palette != "select":
-		return
-
-	if editor_selected_rect_start == Vector2i(-1, -1):
-		return
-
-	if editor_selected_rect_end == Vector2i(-1, -1):
-		return
-
-	var min_x = min(editor_selected_rect_start.x, editor_selected_rect_end.x)
-	var max_x = max(editor_selected_rect_start.x, editor_selected_rect_end.x)
-
-	var min_y = min(editor_selected_rect_start.y, editor_selected_rect_end.y)
-	var max_y = max(editor_selected_rect_start.y, editor_selected_rect_end.y)
-
-	for y in range(min_y, max_y + 1):
-		for x in range(min_x, max_x + 1):
-
-			var cell = Vector2i(x, y)
-
-			if not map_data.is_inside_grid(cell):
-				continue
-
-			draw_rect(
-				map_data.grid_rect(cell),
-				Color(1.0, 1.0, 0.0, 0.25)
-			)
-
-# =========================
-# Draws live select rectangle
-# while Ctrl-dragging.
-# =========================
-
-func draw_editor_select_drag_preview():
-
-	if not editor_mode:
-		return
-
-	if editor_palette != "select":
-		return
-
-	if not editor_select_dragging:
-		return
-
-	var min_x = min(editor_select_start_cell.x, hovered_cell.x)
-	var max_x = max(editor_select_start_cell.x, hovered_cell.x)
-
-	var min_y = min(editor_select_start_cell.y, hovered_cell.y)
-	var max_y = max(editor_select_start_cell.y, hovered_cell.y)
-
-	for y in range(min_y, max_y + 1):
-		for x in range(min_x, max_x + 1):
-
-			var cell = Vector2i(x, y)
-
-			if not map_data.is_inside_grid(cell):
-				continue
-
-			draw_rect(
-				map_data.grid_rect(cell),
-				Color(1.0, 1.0, 0.0, 0.35)
-			)
-
-# =========================
-# Draws editor mode controls
-# and highlights selected option.
-# =========================
-
-func draw_editor_ui():
-
-	if not editor_mode:
-		return
-
-	var x = 12
-	var y = 32
-	var font_size = 16
-	var spacing = 95
-
-	var top_y = y
-	var palette_y = y + 24
-	var option_y = y + 48
-	var action_y = y + 72
-	var facing_y = y + 96
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(x, top_y),
-		"EDITOR MODE",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		font_size,
-		Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(x + 140, top_y),
-		(
-			"Slot "
-			+ str(editor_map_slot)
-			+ " | Campaign: "
-			+ mission_flow_controller.get_campaign_level_id()
-			+ " < >"
-			+ " | Ctrl+S/L Custom"
-			+ " | F9/F10 Campaign"
-		),
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		font_size,
-		Color.YELLOW
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(x + 700, top_y),
-		"[TAB] Palette",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		font_size,
-		Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(x + 900, top_y),
-		"[M] Resize",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		font_size,
-		Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(x + 1080, top_y),
-		"[E] Exit",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		font_size,
-		Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(x, palette_y),
-		"Terrain",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		font_size,
-		Color.YELLOW if editor_palette == "terrain" else Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(x + 110, palette_y),
-		"Player",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		font_size,
-		Color.CORNFLOWER_BLUE if editor_palette == "player_unit" else Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(x + 210, palette_y),
-		"Enemy",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		font_size,
-		Color.INDIAN_RED if editor_palette == "enemy_unit" else Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(x + 310, palette_y),
-		"Reinf",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		font_size,
-		Color.ORANGE if editor_palette == "reinforcement" else Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(x + 420, palette_y),
-		"Zone",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		font_size,
-		Color.CYAN if editor_palette == "zone" else Color.WHITE
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(x + 520, palette_y),
-		"Select",
-		HORIZONTAL_ALIGNMENT_LEFT,
-		-1,
-		font_size,
-		Color.YELLOW if editor_palette == "select" else Color.WHITE
-	)
-
-	if editor_palette == "terrain":
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(x, option_y),
-			"[1] Grass",
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			font_size,
-			Color.YELLOW if selected_editor_tile == "." else Color.WHITE
-		)
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(x + spacing, option_y),
-			"[2] Wall",
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			font_size,
-			Color.YELLOW if selected_editor_tile == "W" else Color.WHITE
-		)
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(x + spacing * 2, option_y),
-			"[3] River",
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			font_size,
-			Color.YELLOW if selected_editor_tile == "R" else Color.WHITE
-		)
-
-	elif (
-		editor_palette == "player_unit"
-		or editor_palette == "enemy_unit"
-		or editor_palette == "reinforcement"
-	):
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(x, option_y),
-			"[1] Fighter",
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			font_size,
-			Color.YELLOW if selected_editor_unit_class == "fighter" else Color.WHITE
-		)
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(x + spacing, option_y),
-			"[2] Tank",
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			font_size,
-			Color.YELLOW if selected_editor_unit_class == "tank" else Color.WHITE
-		)
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(x + spacing * 2, option_y),
-			"[3] Lancer",
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			font_size,
-			Color.YELLOW if selected_editor_unit_class == "lancer" else Color.WHITE
-		)
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(x + spacing * 3, option_y),
-			"[4] Duelist",
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			font_size,
-			Color.YELLOW if selected_editor_unit_class == "duelist" else Color.WHITE
-		)
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(x + spacing * 4, option_y),
-			"[5] Healer",
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			font_size,
-			Color.YELLOW if selected_editor_unit_class == "healer" else Color.WHITE
-		)
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(x + spacing * 5, option_y),
-			"[6] Archer",
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			font_size,
-			Color.YELLOW if selected_editor_unit_class == "archer" else Color.WHITE
-		)
-
-	if editor_palette == "select":
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(x, action_y),
-			"Drag: select area | Right click: deselect",
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			font_size,
-			Color.YELLOW
-		)
-
-		if selected_editor_unit != -1 and selected_editor_unit < units.size():
-
-			var unit = units[selected_editor_unit]
-
-			var ai_profile = "none"
-
-			if unit.has("ai_profile"):
-				ai_profile = unit["ai_profile"]
-
-			var leash_text = "N/A"
-
-			if unit.has("leash_range"):
-				leash_text = str(unit["leash_range"])
-
-			draw_string(
-				ThemeDB.fallback_font,
-				Vector2(x, facing_y),
-				"Selected Unit | AI: " + ai_profile + " | Leash: " + leash_text + " | +/- Adjust",
-				HORIZONTAL_ALIGNMENT_LEFT,
-				-1,
-				font_size,
-				Color.CYAN
-			)
-
-	else:
-
-		var action_text = "Left click: place/paint | Right click: remove/erase | Ctrl+drag: rectangle fill"
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(x, action_y),
-			action_text,
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			font_size,
-			Color.WHITE
-		)
-
-		var facing_text = (
-			"Facing: "
-			+ str(selected_editor_facing)
-			+ " | [F] Rotate"
-		)
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(x, facing_y),
-			facing_text,
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			font_size,
-			Color.WHITE
-		)
-
-		var ai_text = (
-			"AI: "
-			+ selected_editor_ai_profile
-			+ " | [A] Cycle AI"
-		)
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(x + 360, facing_y),
-			ai_text,
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			font_size,
-			Color.WHITE
-		)
-
-		var current_stage = editor_objective_stages[
-			editor_objective_stage_index
-		]
-
-		var stage_detail = ""
-
-		match current_stage.get("type", ""):
-
-			"defeat_enemy_count":
-				stage_detail = (
-					"Kills: "
-					+ str(current_stage.get("required_count", 1))
-				)
-
-			"retreat":
-				stage_detail = (
-					"Zone: "
-					+ str(current_stage.get("zone", ""))
-				)
-
-			"rout":
-				stage_detail = "Defeat all enemies"
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(x + 620, facing_y),
-			(
-				"Obj "
-				+ str(editor_objective_stage_index + 1)
-				+ "/"
-				+ str(editor_objective_stages.size())
-				+ " | Type: "
-				+ str(current_stage.get("type", ""))
-				+ " | "
-				+ stage_detail
-			),
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			font_size,
-			Color.YELLOW
-		)
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(x + 620, facing_y + 24),
-			(
-				"[9/0] Stage  "
-				+ "[P] Type  "
-				+ "[{/}] Value  "
-				+ "[\\] Complete: "
-				+ str(current_stage.get("on_complete", ""))
-				+ "  [O] Add  [Del] Delete"
-			),
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			font_size,
-			Color.YELLOW
-		)
-
-# =========================
-# Rotates editor unit facing
-# clockwise through 8 directions.
-# =========================
-
-func rotate_editor_facing():
-
-	var directions = [
-		Vector2i(0, -1),   # N
-		Vector2i(1, -1),   # NE
-		Vector2i(1, 0),    # E
-		Vector2i(1, 1),    # SE
-		Vector2i(0, 1),    # S
-		Vector2i(-1, 1),   # SW
-		Vector2i(-1, 0),   # W
-		Vector2i(-1, -1)   # NW
-	]
-
-	var current_index = directions.find(selected_editor_facing)
-
-	if current_index == -1:
-		selected_editor_facing = Vector2i(0, -1)
-		return
-
-	var next_index = (current_index + 1) % directions.size()
-
-	selected_editor_facing = directions[next_index]
-
-	queue_redraw()
-
-# =========================
-# Cycles editor palette mode.
-# =========================
-
-func cycle_editor_palette():
-
-	if not editor_mode:
-		return
-
-	if editor_palette == "terrain":
-		editor_palette = "player_unit"
-	elif editor_palette == "player_unit":
-		editor_palette = "enemy_unit"
-	elif editor_palette == "enemy_unit":
-		editor_palette = "reinforcement"
-	elif editor_palette == "reinforcement":
-		editor_palette = "zone"
-	elif editor_palette == "zone":
-		editor_palette = "select"
-	else:
-		editor_palette = "terrain"
-
-	queue_redraw()
-
-# =========================
-# Draws rectangle fill preview
-# while Ctrl-dragging in editor mode.
-# =========================
-
-func draw_editor_rect_preview():
-
-	if not editor_mode:
-		return
-
-	if not editor_rect_dragging:
-		return
-
-	if editor_rect_start_cell == Vector2i(-1, -1):
-		return
-
-	var min_x = min(editor_rect_start_cell.x, hovered_cell.x)
-	var max_x = max(editor_rect_start_cell.x, hovered_cell.x)
-
-	var min_y = min(editor_rect_start_cell.y, hovered_cell.y)
-	var max_y = max(editor_rect_start_cell.y, hovered_cell.y)
-
-	for y in range(min_y, max_y + 1):
-		for x in range(min_x, max_x + 1):
-
-			var cell = Vector2i(x, y)
-
-			if not map_data.is_inside_grid(cell):
-				continue
-
-			draw_rect(
-				map_data.grid_rect(cell),
-				Color(1.0, 1.0, 0.0, 0.35)
-			)
 
 # ==================================================
 # RENDERING
@@ -1381,16 +578,63 @@ func _draw():
 		has_pending_move()
 	)
 
-	draw_editor_rect_preview()
-	draw_editor_select_drag_preview()
-	draw_editor_selected_area()
+	editor_render_system.draw_editor_rect_preview(
+		self,
+		map_data,
+		editor_state,
+		hovered_cell
+	)
+
+	editor_render_system.draw_editor_select_drag_preview(
+		self,
+		map_data,
+		editor_state,
+		hovered_cell
+	)
+
+	editor_render_system.draw_editor_selected_area(
+		self,
+		map_data,
+		editor_state
+	)
+
+	editor_render_system.draw_editor_move_preview(
+		self,
+		map_data,
+		editor_state,
+		hovered_cell
+	)
+	
 	draw_all_defender_leashes()
 	draw_selected_editor_unit_leash()
-	draw_editor_unit_move_preview()
-	draw_editor_reinforcement_markers()
-	draw_editor_move_preview()
-	draw_editor_objective_zones()
-	draw_editor_ui()
+	
+	editor_render_system.draw_editor_unit_move_preview(
+		self,
+		map_data,
+		editor_state,
+		units,
+		hovered_cell
+	)
+
+	editor_render_system.draw_editor_reinforcement_markers(
+		self,
+		map_data,
+		editor_state,
+		units
+	)
+
+	editor_render_system.draw_editor_objective_zones(
+		self,
+		map_data,
+		editor_state
+	)
+	
+	editor_render_system.draw_editor_ui(
+		self,
+		editor_state,
+		mission_flow_controller,
+		units
+	)
 	draw_editor_resize_ui()
 
 # =========================
@@ -1406,10 +650,10 @@ func _draw():
 
 func draw_all_defender_leashes():
 
-	if not editor_mode:
+	if not editor_state.editor_mode:
 		return
 
-	if not show_all_defender_leashes:
+	if not editor_state.show_all_defender_leashes:
 		return
 
 	for unit in units:
@@ -1450,116 +694,6 @@ func draw_all_defender_leashes():
 		)
 
 # =========================
-# Draws destination preview
-# while dragging a selected
-# editor unit.
-#
-# Yellow overlay = unit's
-# pending destination tile.
-# =========================
-
-func draw_editor_unit_move_preview():
-
-	if not editor_mode:
-		return
-
-	if editor_palette != "select":
-		return
-
-	if not editor_unit_move_dragging:
-		return
-
-	if selected_editor_unit == -1:
-		return
-
-	if selected_editor_unit >= units.size():
-		return
-
-	var offset = hovered_cell - editor_unit_move_start_cell
-
-	if offset == Vector2i.ZERO:
-		return
-
-	var target_cell = units[selected_editor_unit]["pos"] + offset
-
-	if not map_data.is_inside_grid(target_cell):
-		return
-
-	draw_rect(
-		map_data.grid_rect(target_cell),
-		Color(1.0, 1.0, 0.0, 0.45)
-	)
-
-# =========================
-# Draws reinforcement markers
-# on staged editor units.
-# =========================
-
-func draw_editor_reinforcement_markers():
-
-	if not editor_mode:
-		return
-
-	for unit in units:
-
-		if not unit.has("starts_hidden"):
-			continue
-
-		if not unit["starts_hidden"]:
-			continue
-
-		var marker_pos = (
-			map_data.grid_rect(unit["pos"]).position
-			+ Vector2(6, 58)
-		)
-
-		draw_rect(
-			map_data.grid_rect(unit["pos"]),
-			Color(0.25, 0.0, 0.35, 0.65),
-			false,
-			5
-		)
-
-		draw_string(
-			ThemeDB.fallback_font,
-			marker_pos,
-			"R" + str(unit["reinforcement_stage"]),
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1,
-			16,
-			Color(0.15, 0.15, 0.15)
-		)
-
-# =========================
-# Draws objective zone tiles
-# while editing maps.
-# =========================
-
-func draw_editor_objective_zones():
-
-	if not editor_mode:
-		return
-
-	for zone_name in objective_zones.keys():
-
-		for cell in objective_zones[zone_name]:
-
-			if not map_data.is_inside_grid(cell):
-				continue
-
-			draw_rect(
-				map_data.grid_rect(cell),
-				Color(0.0, 0.8, 1.0, 0.25)
-			)
-
-			draw_rect(
-				map_data.grid_rect(cell),
-				Color(0.0, 0.8, 1.0, 0.8),
-				false,
-				3
-			)
-
-# =========================
 # Returns zone name used by
 # the active objective stage.
 # =========================
@@ -1587,7 +721,7 @@ func get_active_objective_zone_name() -> String:
 
 func draw_active_objective_zones():
 
-	if editor_mode:
+	if editor_state.editor_mode:
 		return
 
 	var zone_name = get_active_objective_zone_name()
@@ -1595,7 +729,7 @@ func draw_active_objective_zones():
 	if zone_name == "":
 		return
 
-	var zone_tiles = objective_zones.get(
+	var zone_tiles = editor_state.objective_zones.get(
 		zone_name,
 		[]
 	)
@@ -1662,7 +796,7 @@ func get_current_objective_text() -> String:
 
 func draw_current_objective_text():
 
-	if editor_mode:
+	if editor_state.editor_mode:
 		return
 
 	var objective_text = get_current_objective_text()
@@ -1708,13 +842,13 @@ func show_objective_updated_popup():
 
 func add_cell_to_selected_objective_zone(cell: Vector2i):
 
-	if not objective_zones.has(selected_objective_zone):
-		objective_zones[selected_objective_zone] = []
+	if not editor_state.objective_zones.has(editor_state.selected_objective_zone):
+		editor_state.objective_zones[editor_state.selected_objective_zone] = []
 
-	if objective_zones[selected_objective_zone].has(cell):
+	if editor_state.objective_zones[editor_state.selected_objective_zone].has(cell):
 		return
 
-	objective_zones[selected_objective_zone].append(cell)
+	editor_state.objective_zones[editor_state.selected_objective_zone].append(cell)
 
 	queue_redraw()
 
@@ -1725,10 +859,10 @@ func add_cell_to_selected_objective_zone(cell: Vector2i):
 
 func remove_cell_from_selected_objective_zone(cell: Vector2i):
 
-	if not objective_zones.has(selected_objective_zone):
+	if not editor_state.objective_zones.has(editor_state.selected_objective_zone):
 		return
 
-	objective_zones[selected_objective_zone].erase(cell)
+	editor_state.objective_zones[editor_state.selected_objective_zone].erase(cell)
 
 	queue_redraw()
 
@@ -1743,19 +877,19 @@ func remove_cell_from_selected_objective_zone(cell: Vector2i):
 
 func draw_selected_editor_unit_leash():
 
-	if not editor_mode:
+	if not editor_state.editor_mode:
 		return
 
-	if editor_palette != "select":
+	if editor_state.editor_palette != "select":
 		return
 
-	if selected_editor_unit == -1:
+	if editor_state.selected_editor_unit == -1:
 		return
 
-	if selected_editor_unit >= units.size():
+	if editor_state.selected_editor_unit >= units.size():
 		return
 
-	var unit = units[selected_editor_unit]
+	var unit = units[editor_state.selected_editor_unit]
 
 	if not unit.has("home_pos"):
 		return
@@ -1867,7 +1001,7 @@ func draw_inspected_unit_threat_range():
 
 func draw_cursor_preview():
 
-	if editor_mode:
+	if editor_state.editor_mode:
 		return
 
 	if hovered_cell == Vector2i(-1, -1):
@@ -1910,7 +1044,7 @@ func update_hover_unit_panel():
 	var selected_menu_option = action_menu_controller.get_selected_option()
 
 	if (
-		editor_mode
+		editor_state.editor_mode
 		or awaiting_support_confirmation
 		or awaiting_wait_confirmation
 		or (
@@ -2270,7 +1404,7 @@ func setup_current_mission_objective():
 
 	mission_objectives.setup_objective(
 		current_objective_data,
-		objective_zones
+		editor_state.objective_zones
 	)
 
 	if objective_uses_player_start_area():
@@ -2285,7 +1419,7 @@ func update_current_objective_from_editor():
 
 	current_objective_data = {
 		"type": "layered",
-		"stages": editor_objective_stages,
+		"stages": editor_state.editor_objective_stages,
 		"objective_zones": serialize_objective_zones()
 	}
 
@@ -2298,11 +1432,11 @@ func serialize_objective_zones() -> Dictionary:
 
 	var serialized = {}
 
-	for zone_name in objective_zones.keys():
+	for zone_name in editor_state.objective_zones.keys():
 
 		serialized[zone_name] = []
 
-		for cell in objective_zones[zone_name]:
+		for cell in editor_state.objective_zones[zone_name]:
 
 			serialized[zone_name].append({
 				"x": cell.x,
@@ -2319,15 +1453,15 @@ func serialize_objective_zones() -> Dictionary:
 
 func deserialize_objective_zones(data: Dictionary):
 
-	objective_zones.clear()
+	editor_state.objective_zones.clear()
 
 	for zone_name in data.keys():
 
-		objective_zones[zone_name] = []
+		editor_state.objective_zones[zone_name] = []
 
 		for entry in data[zone_name]:
 
-			objective_zones[zone_name].append(
+			editor_state.objective_zones[zone_name].append(
 				Vector2i(
 					entry["x"],
 					entry["y"]
@@ -2345,12 +1479,12 @@ func add_editor_objective_stage():
 		"defeat_enemy_count"
 	)
 
-	editor_objective_stages.insert(
-		editor_objective_stage_index + 1,
+	editor_state.editor_objective_stages.insert(
+		editor_state.editor_objective_stage_index + 1,
 		new_stage
 	)
 
-	editor_objective_stage_index += 1
+	editor_state.editor_objective_stage_index += 1
 
 	queue_redraw()
 
@@ -2362,17 +1496,17 @@ func add_editor_objective_stage():
 
 func delete_editor_objective_stage():
 
-	if editor_objective_stages.size() <= 1:
+	if editor_state.editor_objective_stages.size() <= 1:
 		return
 
-	editor_objective_stages.remove_at(
-		editor_objective_stage_index
+	editor_state.editor_objective_stages.remove_at(
+		editor_state.editor_objective_stage_index
 	)
 
-	editor_objective_stage_index = clamp(
-		editor_objective_stage_index,
+	editor_state.editor_objective_stage_index = clamp(
+		editor_state.editor_objective_stage_index,
 		0,
-		editor_objective_stages.size() - 1
+		editor_state.editor_objective_stages.size() - 1
 	)
 
 	queue_redraw()
@@ -2384,15 +1518,15 @@ func delete_editor_objective_stage():
 
 func change_editor_objective_stage(direction: int):
 
-	editor_objective_stage_index += direction
+	editor_state.editor_objective_stage_index += direction
 
-	if editor_objective_stage_index < 0:
-		editor_objective_stage_index = (
-			editor_objective_stages.size() - 1
+	if editor_state.editor_objective_stage_index < 0:
+		editor_state.editor_objective_stage_index = (
+			editor_state.editor_objective_stages.size() - 1
 		)
 
-	if editor_objective_stage_index >= editor_objective_stages.size():
-		editor_objective_stage_index = 0
+	if editor_state.editor_objective_stage_index >= editor_state.editor_objective_stages.size():
+		editor_state.editor_objective_stage_index = 0
 
 	queue_redraw()
 
@@ -2403,8 +1537,8 @@ func change_editor_objective_stage(direction: int):
 
 func cycle_editor_objective_stage_type():
 
-	var current_stage = editor_objective_stages[
-		editor_objective_stage_index
+	var current_stage = editor_state.editor_objective_stages[
+		editor_state.editor_objective_stage_index
 	]
 
 	var current_type = current_stage.get(
@@ -2412,7 +1546,7 @@ func cycle_editor_objective_stage_type():
 		"defeat_enemy_count"
 	)
 
-	var current_index = editor_objective_stage_types.find(
+	var current_index = editor_state.editor_objective_stage_types.find(
 		current_type
 	)
 
@@ -2421,12 +1555,12 @@ func cycle_editor_objective_stage_type():
 
 	var next_index = (
 		current_index + 1
-	) % editor_objective_stage_types.size()
+	) % editor_state.editor_objective_stage_types.size()
 
-	var next_type = editor_objective_stage_types[next_index]
+	var next_type = editor_state.editor_objective_stage_types[next_index]
 
-	editor_objective_stages[
-		editor_objective_stage_index
+	editor_state.editor_objective_stages[
+		editor_state.editor_objective_stage_index
 	] = get_default_objective_stage(next_type)
 
 	queue_redraw()
@@ -2467,8 +1601,8 @@ func get_default_objective_stage(stage_type: String) -> Dictionary:
 
 func adjust_editor_objective_stage_value(direction: int):
 
-	var current_stage = editor_objective_stages[
-		editor_objective_stage_index
+	var current_stage = editor_state.editor_objective_stages[
+		editor_state.editor_objective_stage_index
 	]
 
 	match current_stage.get("type", ""):
@@ -2479,8 +1613,8 @@ func adjust_editor_objective_stage_value(direction: int):
 				current_stage.get("required_count", 1) + direction
 			)
 
-	editor_objective_stages[
-		editor_objective_stage_index
+	editor_state.editor_objective_stages[
+		editor_state.editor_objective_stage_index
 	] = current_stage
 
 	queue_redraw()
@@ -2498,8 +1632,8 @@ func cycle_editor_objective_completion():
 		"victory"
 	]
 
-	var current_stage = editor_objective_stages[
-		editor_objective_stage_index
+	var current_stage = editor_state.editor_objective_stages[
+		editor_state.editor_objective_stage_index
 	]
 
 	var current_completion = current_stage.get(
@@ -2520,8 +1654,8 @@ func cycle_editor_objective_completion():
 
 	current_stage["on_complete"] = completion_options[next_index]
 
-	editor_objective_stages[
-		editor_objective_stage_index
+	editor_state.editor_objective_stages[
+		editor_state.editor_objective_stage_index
 	] = current_stage
 
 	queue_redraw()
@@ -2545,9 +1679,9 @@ func resolve_objective_event(event_name: String):
 
 		"spawn_reinforcements":
 			pending_reinforcement_spawn = true
-			pending_reinforcement_stage = (
-				mission_objectives.get_objective_stage()
-			)
+			pending_reinforcement_stage = mission_objectives.get_objective_stage()
+
+			await resolve_pending_reinforcements()
 
 			await show_objective_updated_popup()
 
@@ -2740,13 +1874,13 @@ func _ready():
 	# Initial map loading
 	# =========================
 
-	if FileAccess.file_exists(get_editor_map_path()):
+	if FileAccess.file_exists(editor_system.get_editor_map_path(editor_state)):
 
 		map_serializer.load_map(
 			map_data,
 			units,
 			unit_data,
-			get_editor_map_path()
+			editor_system.get_editor_map_path(editor_state)
 		)
 
 	else:
@@ -2825,20 +1959,20 @@ func _process(_delta):
 		action_menu_controller.update_hovered_index_from_mouse()
 
 	if (
-		editor_mode
-		and editor_palette == "terrain"
+		editor_state.editor_mode
+		and editor_state.editor_palette == "terrain"
 		and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 		and not Input.is_key_pressed(KEY_CTRL)
-		and not editor_rect_dragging
+		and not editor_state.editor_rect_dragging
 	):
 		editor_system.paint_tile(
 			map_data,
 			hovered_cell,
-			selected_editor_tile
+			editor_state.selected_editor_tile
 		)
 
 	if (
-		not editor_mode
+		not editor_state.editor_mode
 		and not suppress_map_hover
 	):
 		hover_path_cells = path_preview_system.update_hover_path(
@@ -2897,97 +2031,97 @@ func handle_keyboard_input(event):
 		action_menu_controller.handle_input(event)
 		return
 
-	if editor_resize_mode:
+	if editor_state.editor_resize_mode:
 		handle_editor_resize_input(event)
 		return
 
-	if not editor_mode:
+	if not editor_state.editor_mode:
 		if tactical_input_controller.handle_keyboard_event(event):
 			return
 
 	match event.keycode:
 
 		KEY_A:
-			if editor_mode:
-				cycle_editor_ai_profile()
+			if editor_state.editor_mode:
+				editor_system.cycle_editor_ai_profile(editor_state)
 
 		KEY_E:
-			editor_mode = !editor_mode
+			editor_state.editor_mode = !editor_state.editor_mode
 			clear_pending_action_state()
-			if not editor_mode:
+			if not editor_state.editor_mode:
 				setup_current_mission_objective()
 				await start_battle_flow()
 			queue_redraw()
 
 		KEY_F:
-			if editor_mode:
-				rotate_editor_facing()
+			if editor_state.editor_mode:
+				editor_system.rotate_editor_facing(editor_state)
 
 		KEY_M:
 			start_editor_resize_mode()
 
 		KEY_S:
-			if editor_mode and event.ctrl_pressed:
+			if editor_state.editor_mode and event.ctrl_pressed:
 				save_editor_map()
 
 		KEY_L:
-			if editor_mode and event.ctrl_pressed:
+			if editor_state.editor_mode and event.ctrl_pressed:
 				load_editor_map()
 
 		KEY_F5:
-			if editor_mode:
+			if editor_state.editor_mode:
 				save_editor_map()
 
 		KEY_F6:
-			if editor_mode:
+			if editor_state.editor_mode:
 				load_editor_map()
 
 		KEY_F9:
-			if editor_mode:
+			if editor_state.editor_mode:
 				save_campaign_level()
 
 		KEY_F10:
-			if editor_mode:
+			if editor_state.editor_mode:
 				load_campaign_level()
 
 		KEY_F11:
-			if editor_mode:
+			if editor_state.editor_mode:
 				load_current_campaign_mission()
 
 		KEY_COMMA:
-			if editor_mode:
+			if editor_state.editor_mode:
 				mission_flow_controller.change_campaign_level(-1)
 				queue_redraw()
 
 		KEY_PERIOD:
-			if editor_mode:
+			if editor_state.editor_mode:
 				mission_flow_controller.change_campaign_level(1)
 				queue_redraw()
 
 		KEY_TAB:
-			if editor_mode:
-				cycle_editor_palette()
+			if editor_state.editor_mode:
+				editor_system.cycle_editor_palette(editor_state)
 			else:
 				jump_to_next_unmoved_ally()
 
 		KEY_BRACKETLEFT:
-			if editor_mode:
-				change_editor_map_slot(-1)
+			if editor_state.editor_mode:
+				editor_system.change_editor_map_slot(editor_state, -1)
 
 		KEY_BRACKETRIGHT:
-			if editor_mode:
-				change_editor_map_slot(1)
+			if editor_state.editor_mode:
+				editor_system.change_editor_map_slot(editor_state, 1)
 
 		KEY_EQUAL:
 
 			if (
-				editor_mode
-				and editor_palette == "select"
+				editor_state.editor_mode
+				and editor_state.editor_palette == "select"
 			):
 
 				editor_system.increase_unit_leash_range(
 					units,
-					selected_editor_unit
+					editor_state.selected_editor_unit
 				)
 
 				queue_redraw()
@@ -2995,89 +2129,89 @@ func handle_keyboard_input(event):
 		KEY_MINUS:
 
 			if (
-				editor_mode
-				and editor_palette == "select"
+				editor_state.editor_mode
+				and editor_state.editor_palette == "select"
 			):
 
 				editor_system.decrease_unit_leash_range(
 					units,
-					selected_editor_unit
+					editor_state.selected_editor_unit
 				)
 
 				queue_redraw()
 
 		KEY_DELETE:
-			if editor_mode:
+			if editor_state.editor_mode:
 				delete_editor_objective_stage()
 
 		KEY_O:
-			if editor_mode:
+			if editor_state.editor_mode:
 				add_editor_objective_stage()
 
 		KEY_1:
-			if editor_palette == "terrain":
-				selected_editor_tile = "."
+			if editor_state.editor_palette == "terrain":
+				editor_state.selected_editor_tile = "."
 			else:
-				selected_editor_unit_class = "fighter"
-				validate_selected_editor_ai_profile()
+				editor_state.selected_editor_unit_class = "fighter"
+				editor_system.validate_selected_editor_ai_profile(editor_state)
 				queue_redraw()
 
 		KEY_2:
-			if editor_palette == "terrain":
-				selected_editor_tile = "W"
+			if editor_state.editor_palette == "terrain":
+				editor_state.selected_editor_tile = "W"
 			else:
-				selected_editor_unit_class = "tank"
-				validate_selected_editor_ai_profile()
+				editor_state.selected_editor_unit_class = "tank"
+				editor_system.validate_selected_editor_ai_profile(editor_state)
 				queue_redraw()
 
 		KEY_3:
-			if editor_palette == "terrain":
-				selected_editor_tile = "R"
+			if editor_state.editor_palette == "terrain":
+				editor_state.selected_editor_tile = "R"
 			else:
-				selected_editor_unit_class = "lancer"
-				validate_selected_editor_ai_profile()
+				editor_state.selected_editor_unit_class = "lancer"
+				editor_system.validate_selected_editor_ai_profile(editor_state)
 				queue_redraw()
 
 		KEY_4:
-			if editor_palette != "terrain":
-				selected_editor_unit_class = "duelist"
-				validate_selected_editor_ai_profile()
+			if editor_state.editor_palette != "terrain":
+				editor_state.selected_editor_unit_class = "duelist"
+				editor_system.validate_selected_editor_ai_profile(editor_state)
 				queue_redraw()
 
 		KEY_5:
-			if editor_palette != "terrain":
-				selected_editor_unit_class = "healer"
-				validate_selected_editor_ai_profile()
+			if editor_state.editor_palette != "terrain":
+				editor_state.selected_editor_unit_class = "healer"
+				editor_system.validate_selected_editor_ai_profile(editor_state)
 				queue_redraw()
 
 		KEY_6:
-			if editor_palette != "terrain":
-				selected_editor_unit_class = "archer"
-				validate_selected_editor_ai_profile()
+			if editor_state.editor_palette != "terrain":
+				editor_state.selected_editor_unit_class = "archer"
+				editor_system.validate_selected_editor_ai_profile(editor_state)
 				queue_redraw()
 
 		KEY_9:
-			if editor_mode:
+			if editor_state.editor_mode:
 				change_editor_objective_stage(-1)
 
 		KEY_0:
-			if editor_mode:
+			if editor_state.editor_mode:
 				change_editor_objective_stage(1)
 
 		KEY_P:
-			if editor_mode:
+			if editor_state.editor_mode:
 				cycle_editor_objective_stage_type()
 
 		KEY_BRACELEFT:
-			if editor_mode:
+			if editor_state.editor_mode:
 				adjust_editor_objective_stage_value(-1)
 
 		KEY_BRACERIGHT:
-			if editor_mode:
+			if editor_state.editor_mode:
 				adjust_editor_objective_stage_value(1)
 
 		KEY_BACKSLASH:
-			if editor_mode:
+			if editor_state.editor_mode:
 				cycle_editor_objective_completion()
 
 		KEY_C:
@@ -3090,8 +2224,8 @@ func handle_keyboard_input(event):
 			cancel_pending_action()
 
 		KEY_F7:
-			if editor_mode:
-				show_all_defender_leashes = !show_all_defender_leashes
+			if editor_state.editor_mode:
+				editor_state.show_all_defender_leashes = !editor_state.show_all_defender_leashes
 				queue_redraw()
 
 # =========================
@@ -3246,28 +2380,28 @@ func handle_mouse_input(event):
 
 	if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 
-		if editor_mode:
+		if editor_state.editor_mode:
 
-			if editor_palette == "select":
+			if editor_state.editor_palette == "select":
 
-				selected_editor_unit = -1
+				editor_state.selected_editor_unit = -1
 
-				editor_selected_rect_start = Vector2i(-1, -1)
-				editor_selected_rect_end = Vector2i(-1, -1)
+				editor_state.editor_selected_rect_start = Vector2i(-1, -1)
+				editor_state.editor_selected_rect_end = Vector2i(-1, -1)
 
-				editor_select_dragging = false
-				editor_select_start_cell = Vector2i(-1, -1)
+				editor_state.editor_select_dragging = false
+				editor_state.editor_select_start_cell = Vector2i(-1, -1)
 
 				queue_redraw()
 				return
 
-			if editor_palette == "zone":
+			if editor_state.editor_palette == "zone":
 
 				remove_cell_from_selected_objective_zone(hovered_cell)
 				queue_redraw()
 				return
 
-			if editor_palette == "terrain":
+			if editor_state.editor_palette == "terrain":
 
 				editor_system.paint_tile(
 					map_data,
@@ -3302,11 +2436,11 @@ func handle_mouse_input(event):
 
 	if event.button_index == MOUSE_BUTTON_LEFT:
 
-		if editor_mode:
+		if editor_state.editor_mode:
 
 			if event.pressed:
 
-				if editor_palette == "select":
+				if editor_state.editor_palette == "select":
 
 					var clicked_unit = unit_query.get_unit_at(
 						units,
@@ -3315,51 +2449,51 @@ func handle_mouse_input(event):
 
 					if clicked_unit != -1:
 
-						selected_editor_unit = clicked_unit
+						editor_state.selected_editor_unit = clicked_unit
 
-						editor_selected_rect_start = Vector2i(-1, -1)
-						editor_selected_rect_end = Vector2i(-1, -1)
+						editor_state.editor_selected_rect_start = Vector2i(-1, -1)
+						editor_state.editor_selected_rect_end = Vector2i(-1, -1)
 
-						editor_unit_move_dragging = true
-						editor_unit_move_start_cell = hovered_cell
+						editor_state.editor_unit_move_dragging = true
+						editor_state.editor_unit_move_start_cell = hovered_cell
 
 						queue_redraw()
 						return
 
-					selected_editor_unit = -1
+					editor_state.selected_editor_unit = -1
 
-					if editor_cell_is_inside_selected_area(hovered_cell):
+					if editor_system.editor_cell_is_inside_selected_area(editor_state, hovered_cell):
 
-						editor_move_dragging = true
-						editor_move_start_cell = hovered_cell
+						editor_state.editor_move_dragging = true
+						editor_state.editor_move_start_cell = hovered_cell
 
 					else:
 
-						editor_select_dragging = true
-						editor_select_start_cell = hovered_cell
+						editor_state.editor_select_dragging = true
+						editor_state.editor_select_start_cell = hovered_cell
 
 					return
 
 				if event.ctrl_pressed:
 
-					editor_rect_dragging = true
-					editor_rect_start_cell = hovered_cell
+					editor_state.editor_rect_dragging = true
+					editor_state.editor_rect_start_cell = hovered_cell
 					return
 
 				handle_left_click()
 				return
 
-			if not event.pressed and editor_unit_move_dragging:
+			if not event.pressed and editor_state.editor_unit_move_dragging:
 
-				var offset = hovered_cell - editor_unit_move_start_cell
+				var offset = hovered_cell - editor_state.editor_unit_move_start_cell
 
 				if (
-					selected_editor_unit != -1
-					and selected_editor_unit < units.size()
+					editor_state.selected_editor_unit != -1
+					and editor_state.selected_editor_unit < units.size()
 					and offset != Vector2i.ZERO
 				):
 
-					var target_cell = units[selected_editor_unit]["pos"] + offset
+					var target_cell = units[editor_state.selected_editor_unit]["pos"] + offset
 
 					if (
 						map_data.is_inside_grid(target_cell)
@@ -3373,70 +2507,70 @@ func handle_mouse_input(event):
 
 						if (
 							occupied_unit == -1
-							or occupied_unit == selected_editor_unit
+							or occupied_unit == editor_state.selected_editor_unit
 						):
 
-							units[selected_editor_unit]["pos"] = target_cell
+							units[editor_state.selected_editor_unit]["pos"] = target_cell
 
-							if units[selected_editor_unit].has("home_pos"):
-								units[selected_editor_unit]["home_pos"] += offset
+							if units[editor_state.selected_editor_unit].has("home_pos"):
+								units[editor_state.selected_editor_unit]["home_pos"] += offset
 
-				editor_unit_move_dragging = false
-				editor_unit_move_start_cell = Vector2i(-1, -1)
+				editor_state.editor_unit_move_dragging = false
+				editor_state.editor_unit_move_start_cell = Vector2i(-1, -1)
 
 				queue_redraw()
 				return
 
-			if not event.pressed and editor_move_dragging:
+			if not event.pressed and editor_state.editor_move_dragging:
 
-				var offset = hovered_cell - editor_move_start_cell
+				var offset = hovered_cell - editor_state.editor_move_start_cell
 
 				editor_system.move_selection(
 					map_data,
 					units,
-					editor_selected_rect_start,
-					editor_selected_rect_end,
+					editor_state.editor_selected_rect_start,
+					editor_state.editor_selected_rect_end,
 					offset
 				)
 
-				editor_selected_rect_start += offset
-				editor_selected_rect_end += offset
+				editor_state.editor_selected_rect_start += offset
+				editor_state.editor_selected_rect_end += offset
 
-				editor_move_dragging = false
-				editor_move_start_cell = Vector2i(-1, -1)
-
-				queue_redraw()
-				return
-
-			if not event.pressed and editor_select_dragging:
-
-				editor_selected_rect_start = Vector2i(
-					min(editor_select_start_cell.x, hovered_cell.x),
-					min(editor_select_start_cell.y, hovered_cell.y)
-				)
-
-				editor_selected_rect_end = Vector2i(
-					max(editor_select_start_cell.x, hovered_cell.x),
-					max(editor_select_start_cell.y, hovered_cell.y)
-				)
-
-				editor_select_dragging = false
-				editor_select_start_cell = Vector2i(-1, -1)
+				editor_state.editor_move_dragging = false
+				editor_state.editor_move_start_cell = Vector2i(-1, -1)
 
 				queue_redraw()
 				return
 
-			if not event.pressed and editor_rect_dragging:
+			if not event.pressed and editor_state.editor_select_dragging:
+
+				editor_state.editor_selected_rect_start = Vector2i(
+					min(editor_state.editor_select_start_cell.x, hovered_cell.x),
+					min(editor_state.editor_select_start_cell.y, hovered_cell.y)
+				)
+
+				editor_state.editor_selected_rect_end = Vector2i(
+					max(editor_state.editor_select_start_cell.x, hovered_cell.x),
+					max(editor_state.editor_select_start_cell.y, hovered_cell.y)
+				)
+
+				editor_state.editor_select_dragging = false
+				editor_state.editor_select_start_cell = Vector2i(-1, -1)
+
+				queue_redraw()
+				return
+
+			if not event.pressed and editor_state.editor_rect_dragging:
 
 				editor_system.fill_rect(
 					map_data,
-					editor_rect_start_cell,
+					editor_state.editor_rect_start_cell,
 					hovered_cell,
-					selected_editor_tile
+					editor_state.selected_editor_tile
 				)
 
-				editor_rect_dragging = false
-				editor_rect_start_cell = Vector2i(-1, -1)
+				editor_state.editor_rect_dragging = false
+				editor_state.editor_rect_start_cell = Vector2i(-1, -1)
 
 				queue_redraw()
 				return
@@ -3459,21 +2593,21 @@ func handle_left_click():
 	# Editor mode terrain painting
 	# =========================
 
-	if editor_mode:
+	if editor_state.editor_mode:
 
-		if editor_palette == "terrain":
+		if editor_state.editor_palette == "terrain":
 
 			editor_system.paint_tile(
 				map_data,
 				clicked_cell,
-				selected_editor_tile
+				editor_state.selected_editor_tile
 			)
 
-		elif editor_palette == "zone":
+		elif editor_state.editor_palette == "zone":
 
 			add_cell_to_selected_objective_zone(clicked_cell)
 
-		elif editor_palette == "player_unit":
+		elif editor_state.editor_palette == "player_unit":
 
 			editor_system.place_unit(
 				units,
@@ -3481,13 +2615,13 @@ func handle_left_click():
 				unit_data,
 				map_data,
 				clicked_cell,
-				selected_editor_unit_class,
+				editor_state.selected_editor_unit_class,
 				"player",
-				selected_editor_facing,
-				selected_editor_ai_profile
+				editor_state.selected_editor_facing,
+				editor_state.selected_editor_ai_profile
 			)
 
-		elif editor_palette == "enemy_unit":
+		elif editor_state.editor_palette == "enemy_unit":
 
 			editor_system.place_unit(
 				units,
@@ -3495,13 +2629,13 @@ func handle_left_click():
 				unit_data,
 				map_data,
 				clicked_cell,
-				selected_editor_unit_class,
+				editor_state.selected_editor_unit_class,
 				"enemy",
-				selected_editor_facing,
-				selected_editor_ai_profile
+				editor_state.selected_editor_facing,
+				editor_state.selected_editor_ai_profile
 			)
 
-		elif editor_palette == "reinforcement":
+		elif editor_state.editor_palette == "reinforcement":
 
 			editor_system.place_unit(
 				units,
@@ -3509,10 +2643,10 @@ func handle_left_click():
 				unit_data,
 				map_data,
 				clicked_cell,
-				selected_editor_unit_class,
+				editor_state.selected_editor_unit_class,
 				"enemy",
-				selected_editor_facing,
-				selected_editor_ai_profile
+				editor_state.selected_editor_facing,
+				editor_state.selected_editor_ai_profile
 			)
 
 			var placed_unit = unit_query.get_unit_at(
@@ -3521,7 +2655,7 @@ func handle_left_click():
 			)
 
 			if placed_unit != -1:
-				units[placed_unit]["reinforcement_stage"] = editor_reinforcement_stage
+				units[placed_unit]["reinforcement_stage"] = editor_state.editor_reinforcement_stage
 				units[placed_unit]["starts_hidden"] = true
 
 		queue_redraw()
@@ -3994,9 +3128,6 @@ func confirm_attack():
 
 	queue_redraw()
 	await check_mission_end_conditions()
-	if pending_reinforcement_spawn:
-		await resolve_pending_reinforcements()
-		return
 	await start_ai_turn_if_needed()
 
 # =========================
